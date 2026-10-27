@@ -1,0 +1,12 @@
+label=baseline-2026-10-24
+candidate=full
+baseline=material
+openings_path=docs/selfplay/openings.txt
+nodes_per_move=5000
+movetime_ms=none
+max_plies=160
+tt_mb=16
+seed=1
+hardware=Intel Core i5-13600HX, Windows 11 Pro, MSYS2 UCRT64, GCC 16.2.0
+compiler=GNU 16.2.0
+build_type=Release

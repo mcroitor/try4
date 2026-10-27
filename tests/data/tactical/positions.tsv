@@ -1,0 +1,16 @@
+# Curated tactical and fixed-depth search regression corpus.
+# Columns are tab-separated: id, phase, FEN, depth, expectations, avoid, note.
+# Expectations are semicolon-separated:
+#   mate:N   - exact mate score kMateScore - N plies
+#   best:UCI - exact best move
+#   positive - score is greater than zero
+# N counts plies, so a chess "mate in 2" is mate:3 and needs depth 3.
+# A depth-only search is used; no clock fields are set.
+
+mate1-scholar	middlegame	r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1	1	mate:1;best:f3f7	-	Scholar's-mate queen sacrifice; tests mate detection at the root boundary.
+mate2-kqk	endgame	7k/8/8/4K3/8/8/8/6Q1 w - - 0 1	3	mate:3;best:e5f6	-	Mate in 2 moves (3 plies); king opposition followed by queen mate.
+mate3-krk	endgame	7k/8/8/4K3/8/8/8/R7 w - - 0 1	5	mate:5;best:e5f6	-	Mate in 3 moves (5 plies); rook ladder with king opposition.
+capture-hanging-queen	opening	rnb1kbnr/pppp1ppp/8/4p3/4P2q/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 1	2	best:f3h4;positive	-	Knight captures the undefended queen; opening hanging-piece motif.
+stalemate-avoid-kqk	endgame	7k/8/5K2/6Q1/8/8/8/8 w - - 0 1	2	mate:1;best:g5g7	g5g6	Qg6?? stalemates; the winning move is the immediate queen mate.
+regression-kiwipete	middlegame	r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1	3	best:e2a6	-	Fixed-depth ordering, quiescence, PV, and TT regression.
+regression-perft3	endgame	8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1	3	best:b4f4	-	Fixed-depth quiet continuation after a capture; material-baseline regression.

@@ -1,0 +1,9 @@
+try4 UCI stability v0.1.0-final
+engine: try4 0.1.0
+games: 1000/1000 in 1290.4s
+results W/D/L (white perspective): 248/488/264
+terminations: {'checkmate': 512, 'max-plies': 399, 'threefold-repetition': 85, 'insufficient-material': 1, 'stalemate': 3}
+protocol failures: 0 {}
+move wall ms: {'count': 92839, 'min': 1.107, 'p50': 58.831, 'p95': 60.858, 'p99': 61.931, 'max': 67.745, 'mean': 51.767}
+stop latency ms: {'count': 40, 'min': 0.145, 'p50': 0.212, 'p95': 0.424, 'p99': 0.516, 'max': 0.516, 'mean': 0.229}
+ready latency ms: {'count': 2040, 'min': 0.007, 'p50': 1.537, 'p95': 1.982, 'p99': 2.815, 'max': 4.776, 'mean': 1.549}

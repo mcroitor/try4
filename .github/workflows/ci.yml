@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build/cmake
+          -DCMAKE_BUILD_TYPE=Debug
+          -DTRY4_BUILD_TESTS=ON
+          -DTRY4_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build build/cmake --config Debug
+
+      - name: Test
+        run: ctest --test-dir build/cmake -C Debug --output-on-failure
+
+  sanitizers:
+    name: ASan/UBSan (Ubuntu)
+    runs-on: ubuntu-latest
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build/asan
+          -DCMAKE_BUILD_TYPE=Debug
+          -DTRY4_BUILD_TESTS=ON
+          -DTRY4_WARNINGS_AS_ERRORS=ON
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build/asan
+
+      - name: Test
+        run: ctest --test-dir build/asan --output-on-failure

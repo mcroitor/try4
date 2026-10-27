@@ -1,0 +1,38 @@
+# Build output
+/build/
+/dist/
+/cmake-build-*/
+
+# Object files and binaries
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.a
+*.d
+*.pdb
+*.ilk
+*.exp
+
+# CMake and IDE state
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# NetBeans private state
+/nbproject/private/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# OS metadata
+.DS_Store
+Thumbs.db
