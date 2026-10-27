@@ -64,7 +64,8 @@ The task estimates total roughly **57 effort-days**:
 
 The search-performance increment (tasks 049–057) adds roughly **8–11
 effort-days** plus match and benchmark runtime. It is additional to the
-original 038-task baseline.
+original 038-task baseline. The resignation-policy increment (task 058) adds
+roughly **0.5–1 effort-day**.
 
 These are planning ranges for one developer, including tests and documentation.
 They are not calendar commitments.
@@ -130,6 +131,7 @@ They are not calendar commitments.
 |  055 | Add principal-variation search and aspiration windows                      | Strength     | 052, 053      | 1 day    |
 |  056 | Add guarded null-move, LMR, check extensions and delta pruning              | Strength     | 055           | 1.5–2 days |
 |  057 | Harden the 60-move clock budget and validate the depth work in a TSCP match | Strength     | 049–056       | 1 day + match |
+|  058 | Add a configurable resignation threshold                                   | Post-release | 039, 043      | 0.5–1 day |
 
 ### Configuration and forcing-search increment (2026-10-26)
 
@@ -189,7 +191,7 @@ start position reaches depth 6 at 116k NPS and Kiwipete depth 4 at 61k NPS;
 Debug is ~9-10x slower at the same depth. The earlier 2,462-node depth-4 figure
 was a warm-TT count; the harness clears the TT before every search and measures
 3,556 nodes. See `docs/PERFORMANCE.md`, "Search baseline (2026-10-27)". Task 050
-is now ready.
+is done and task 051 is ready.
 
 Dependency order:
 
@@ -221,6 +223,17 @@ Rules for this increment:
   suite are the gates.
 - Bitboards and other representation work remain out of scope. The measured
   target is cost per node, not a rewrite.
+
+### Resignation policy (defined 2026-10-27)
+
+Task 058 adds a configurable resignation threshold for ordinary UCI game
+searches. The default is `-600` cp; `[search] resign_cp` and the `Resign` UCI
+spin option share the value, and `0` disables it. The decision uses the last
+completed search score (`SearchInfo::scoreCp`), not the raw static evaluator.
+Resignation is signalled by `info string resign ...` followed by
+`bestmove 0000`; infinite analysis, book moves, terminal roots and searches
+without a completed iteration never resign. The task is independent of the
+050–057 hot-path work and can run in parallel.
 
 ## Critical path
 
