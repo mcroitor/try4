@@ -145,6 +145,13 @@ depth 5 and below on that position.
 
 ### Fixed time — 2000 ms per search (Release)
 
+> **Reporting note (2026-10-27):** these rows were recorded before the UCI
+> adapter streamed per-depth `info` lines. The last `info` before `bestmove` now
+> reports the last completed iteration, whereas the original run used a single
+> final line whose node count included the aborted next iteration. Re-run this
+> table before comparing fixed-time NPS with later builds; the fixed-depth node
+> counts and PVs remain the stable reference.
+
 | Position | Kind | Depth | Nodes | NPS min | NPS median | NPS max | Spread | Best move |
 |---|---|---:|---:|---:|---:|---:|---:|---|
 | startpos | opening | 6 | 229,788 | 114,876 | 116,054 | 116,235 | 1.2% | b1c3 |

@@ -405,7 +405,8 @@ std::size_t Searcher::TranspositionTableMegabytes() const {
 }
 
 SearchInfo Searcher::Search(const Position& position, const SearchLimits& requested_limits,
-                            std::atomic_bool& stop) {
+                            std::atomic_bool& stop,
+                            const SearchProgressCallback& on_progress) {
     const SearchLimits limits = requested_limits;
     if (!previous_policy_ || previous_policy_->evaluation != limits.evaluation ||
         previous_policy_->forcing != limits.forcing ||
@@ -501,6 +502,10 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
         info.scoreCp = score;
         info.pv = pv;
         info.bestMove = pv.front();
+
+        if (on_progress) {
+            on_progress(info);
+        }
 
         // A mate score is exact and cannot be improved by a deeper search.
         if (std::abs(score) >= kMateThreshold) {

@@ -57,8 +57,11 @@ quit
 
 The `#` lines above are explanatory and should not be sent by a GUI.
 `--version` prints the same version without starting the protocol loop.
-`stop` requests cancellation, and `quit` joins the search thread. Search info
-is currently emitted at completion, not periodically.
+`stop` requests cancellation, and `quit` joins the search thread. The engine
+emits one `info depth ...` line after each completed iterative-deepening
+iteration, followed by `bestmove` when the search ends. If no iteration
+completes (a terminal root, an immediate stop, or a zero budget), a single
+`info depth 0` line is emitted before `bestmove`.
 
 ## Protocol behavior and remaining limitations
 

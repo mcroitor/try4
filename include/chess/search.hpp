@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -103,6 +104,12 @@ struct SearchInfo {
     std::optional<Move> bestMove;
 };
 
+// Optional progress observer. It is called on the searching thread after each
+// completed iterative-deepening iteration, with the same information that
+// Search() will return for that iteration. The callback must not re-enter the
+// Searcher; UCI uses it to stream `info` lines.
+using SearchProgressCallback = std::function<void(const SearchInfo&)>;
+
 class Searcher {
 public:
     explicit Searcher(std::size_t transpositionTableMegabytes = 16);
@@ -114,9 +121,11 @@ public:
     // Searches a copy of `position`; the caller's position is never modified.
     // The search polls `stop` and any hard deadline every 32 nodes and returns
     // the best information from the last completed depth. `stop` may be set
-    // before or during the search.
+    // before or during the search. When `on_progress` is set, it is invoked
+    // after every completed iteration, before the search advances or stops.
     SearchInfo Search(const Position& position, const SearchLimits& limits,
-                      std::atomic_bool& stop);
+                      std::atomic_bool& stop,
+                      const SearchProgressCallback& on_progress = {});
 
 private:
     TranspositionTable table_;

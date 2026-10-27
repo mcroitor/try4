@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <string>
 #include <vector>
@@ -81,6 +82,34 @@ TEST_CASE("search chooses a forced winning capture", "[search]") {
     REQUIRE(info.bestMove->ToUci() == "e4d5");
     REQUIRE(info.pv.size() == 1);
     REQUIRE(info.scoreCp > 0);
+}
+
+TEST_CASE("search reports every completed iteration", "[search]") {
+    chess::Position position;
+    position.SetupInitial();
+    chess::SearchLimits limits;
+    limits.depth = 4;
+    std::atomic_bool stop{false};
+
+    std::vector<int> depths;
+    std::vector<std::uint64_t> nodes;
+    std::vector<std::string> best_moves;
+    const chess::SearchInfo info = chess::Searcher().Search(
+        position, limits, stop, [&](const chess::SearchInfo& progress) {
+            depths.push_back(progress.depth);
+            nodes.push_back(progress.nodes);
+            REQUIRE(progress.bestMove.has_value());
+            REQUIRE_FALSE(progress.pv.empty());
+            REQUIRE(progress.pv.front() == *progress.bestMove);
+            best_moves.push_back(progress.bestMove->ToUci());
+        });
+
+    REQUIRE(depths == std::vector<int>{1, 2, 3, 4});
+    REQUIRE(nodes.front() > 0);
+    REQUIRE(std::is_sorted(nodes.begin(), nodes.end()));
+    REQUIRE(info.depth == 4);
+    REQUIRE(info.bestMove.has_value());
+    REQUIRE(best_moves.back() == info.bestMove->ToUci());
 }
 
 TEST_CASE("fixed-depth search is deterministic and leaves the caller intact",

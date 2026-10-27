@@ -428,7 +428,12 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
     const auto start_time = Clock::now();
 
     std::atomic_bool& stop = stop_flag_;
-    const SearchInfo info = searcher_->Search(position, limits, stop);
+    const SearchProgressCallback on_progress = [&](const SearchInfo& progress) {
+        const auto elapsed_ms =
+            std::chrono::duration_cast<Ms>(Clock::now() - start_time).count();
+        EmitInfo(out, progress, progress.depth, progress.nodes, elapsed_ms);
+    };
+    const SearchInfo info = searcher_->Search(position, limits, stop, on_progress);
     if (limits.infinite) {
         std::unique_lock<std::mutex> lock(stop_mutex_);
         stop_condition_.wait(lock, [this] { return stop_flag_.load(); });
@@ -438,8 +443,13 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
     const std::int64_t elapsed_ms =
         std::chrono::duration_cast<Ms>(end_time - start_time).count();
 
-    // Emit final info with depth and bestmove.
-    EmitInfo(out, info, info.depth, info.nodes, elapsed_ms);
+    // A normal search already streamed every completed iteration. Emit one
+    // final line only when no iteration finished (terminal root, immediate
+    // stop, or a zero budget) so the protocol still has a score/PV line before
+    // bestmove.
+    if (info.depth == 0) {
+        EmitInfo(out, info, info.depth, info.nodes, elapsed_ms);
+    }
     EmitBestMove(out, info);
 
     searching_.store(false, std::memory_order_release);
@@ -448,7 +458,6 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
 void UciEngine::EmitInfo(std::ostream& out, const SearchInfo& info, int depth,
                          std::uint64_t nodes, std::int64_t elapsed_ms) {
     const std::lock_guard<std::mutex> lock(output_mutex_);
-    // In a real engine, we'd emit periodic updates. For now, emit final info.
     std::ostringstream oss;
     oss << "info depth " << depth;
     if (std::abs(info.scoreCp) >= kMateThreshold) {
