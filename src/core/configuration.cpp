@@ -156,8 +156,8 @@ std::optional<UciOptions> ParseConfiguration(std::istream& input,
         const auto value = Trim(line.substr(equals + 1));
         if (!seen.insert(section + "." + key).second) { return fail("duplicate key " + section + "." + key); }
         if (section == "uci" && key == "threads") {
-            int number = 0;
-            if (!Integer(value, &number, 1, 1)) {
+            int threads = 0;
+            if (!Integer(value, &threads, 1, 1)) {
                 return fail("uci.threads=" + value +
                             " is not supported; only one search thread is implemented");
             }
