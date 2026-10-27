@@ -62,6 +62,10 @@ The task estimates total roughly **57 effort-days**:
 - Stage 7 (tasks 033–035, optional): ~7 effort-days.
 - Stage 8 (tasks 036–038, release): ~2.5 effort-days.
 
+The search-performance increment (tasks 049–057) adds roughly **8–11
+effort-days** plus match and benchmark runtime. It is additional to the
+original 038-task baseline.
+
 These are planning ranges for one developer, including tests and documentation.
 They are not calendar commitments.
 
@@ -117,6 +121,15 @@ They are not calendar commitments.
 |  046 | Validate configurable evaluation and forcing search                         | Enhancement | 041–045       | 1–2 days + matches |
 |  047 | Complete independent release verification                                  | Post-release | 037, 038      | 0.5–1 day + CI |
 |  048 | Prototype Lazy SMP and decide whether parallel search is viable             | Post-release | 038, 039      | 4–6 days + runtime |
+|  049 | Record the search baseline and add a repeatable benchmark harness          | Performance  | 048           | 0.5 day  |
+|  050 | Add allocation-free move generation and unchecked make/unmake to Position  | Performance  | 049           | 1 day    |
+|  051 | Restructure the search hot path: one generation per node, fixed PV, no heap | Performance  | 050           | 1.5 days |
+|  052 | Replace the full sort with a score-once staged move picker                 | Performance  | 051           | 0.5 day  |
+|  053 | Improve transposition-table reuse without changing fixed-depth results     | Performance  | 051           | 0.5 day  |
+|  054 | Cut evaluation cost while keeping scores byte-identical                    | Performance  | 051           | 0.5–1 day |
+|  055 | Add principal-variation search and aspiration windows                      | Strength     | 052, 053      | 1 day    |
+|  056 | Add guarded null-move, LMR, check extensions and delta pruning              | Strength     | 055           | 1.5–2 days |
+|  057 | Harden the 60-move clock budget and validate the depth work in a TSCP match | Strength     | 049–056       | 1 day + match |
 
 ### Configuration and forcing-search increment (2026-10-26)
 
@@ -149,6 +162,65 @@ not depend on 044's implementation. If 040 approves full PST cells or extensions
 inside the main search, update the affected contracts before starting them.
 These estimates are additional to the original 038-task baseline. Current
 implementation details and observations are recorded in the per-task reports.
+
+### Search performance and depth increment (2026-10-27)
+
+A test match against TSCP reported try4 reaching roughly 4 halfmoves while TSCP
+reached 7-9 at 60 moves / 2 minutes. Analysis of the 0.1.0 search found that the
+main deficit is cost per node, not the algorithm:
+
+- every interior node generates legal moves about `2 + N` times because
+  `Result()`, `LegalMoves()` and `MakeMove()` each regenerate them, and the
+  `const` variant copies the whole `Position` including `history_`;
+- the PV is propagated with `std::vector` per node and per child;
+- move ordering sorts every node with a comparator that recomputes its score
+  twice per comparison;
+- evaluation validates its parameters and sweeps the board about ten times per
+  call;
+- no PVS, aspiration windows, null-move, LMR, check extensions or delta pruning;
+- the soft clock limit is only checked between iterations, so one iteration can
+  consume two moves of budget.
+
+Measured on 2026-10-27 (Debug, g++ 16.2.0, start position): depth 4 in 102 ms
+(2,462 nodes, 24k NPS), depth 5 in 1.08 s (23k NPS), depth 6 in 4.35 s (13k
+NPS), while the same build runs perft at ~1.14M nodes/s. Task 049 is done and
+replaces these ad-hoc Debug figures with a recorded Release baseline: at 2 s the
+start position reaches depth 6 at 116k NPS and Kiwipete depth 4 at 61k NPS;
+Debug is ~9-10x slower at the same depth. The earlier 2,462-node depth-4 figure
+was a warm-TT count; the harness clears the TT before every search and measures
+3,556 nodes. See `docs/PERFORMANCE.md`, "Search baseline (2026-10-27)". Task 050
+is now ready.
+
+Dependency order:
+
+```text
+049 → 050 → 051 → 052 ─┐
+                 053 ──┴→ 055 → 056 → 057
+                 054  (parallel; contributes NPS evidence in 057)
+```
+
+Gates:
+
+| Gate | After | Requirement |
+|---|---|---|
+| S1 | 051 | Golden corpus identical; >= 3x NPS over 049; depth >= 6 at 2 s |
+| S2 | 056 | +2 plies at 2 s on >= 4 of 6 benchmark positions; tactical suite 100%; flags-off exactness intact |
+| S3 | 057 | 200-game match vs TSCP at 60/120 with a non-negative score, zero forfeits and zero illegal moves |
+
+The 049 baseline already reaches depth 6 at 2 s on the start position, so S1's
+discriminating target is the 3x NPS requirement (about 350k NPS at 2 s on the
+start position) and reaching depth 6 on the tactical positions as well.
+
+Rules for this increment:
+
+- Freeze the golden corpus (task 051) before changing the search; never
+  regenerate expected values from the new engine.
+- Every strength change is switchable, and the "all features off" path must
+  reproduce the exact minimax score.
+- Node counts alone are not strength evidence; the TSCP match and the tactical
+  suite are the gates.
+- Bitboards and other representation work remain out of scope. The measured
+  target is cost per node, not a rewrite.
 
 ## Critical path
 
