@@ -7,9 +7,7 @@
 | **Depends on** | 050 |
 | **Estimate** | 1.5 days |
 | **Priority** | P1 |
-| **Status** | Blocked |
-
-**Blocker:** waiting for task 050. Flip to `Ready` when 050 is `Done`.
+| **Status** | Ready |
 
 ## Objective
 

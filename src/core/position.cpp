@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -212,35 +213,18 @@ std::uint64_t Position::ComputeHash() const {
     return hash;
 }
 
-bool Position::SamePositionForRepetition(const Position& other) const {
-    return board_ == other.board_ && side_to_move_ == other.side_to_move_ &&
-           castling_rights_ == other.castling_rights_ &&
-           HashEnPassantFile() == other.HashEnPassantFile();
-}
-
-bool Position::IsThreefoldRepetition() const {
+bool Position::IsRepetition() const {
     std::size_t occurrences = 1;
-    const std::size_t depth = history_.size();
-
-    for (std::size_t i = 0; i < depth; ++i) {
-        if (history_[i].hash != hash_) {
-            continue;
-        }
-
-        Position past = *this;
-        for (std::size_t undone = i; undone < depth; ++undone) {
-            const bool success = past.UndoMove();
-            assert(success);
-            (void)success;
-        }
-        if (past.SamePositionForRepetition(*this)) {
-            ++occurrences;
-            if (occurrences >= 3) {
-                return true;
-            }
+    for (const HistoryEntry& entry : history_) {
+        if (entry.hash == hash_ && ++occurrences >= 3) {
+            return true;
         }
     }
     return false;
+}
+
+bool Position::IsThreefoldRepetition() const {
+    return IsRepetition();
 }
 
 bool Position::HasInsufficientMaterial() const {
@@ -323,14 +307,19 @@ std::string Position::ToString() const {
     return result;
 }
 
-std::vector<Move> Position::LegalMoves() {
+std::size_t Position::GenerateLegalMoves(MoveList* out) const {
+    if (out == nullptr) {
+        assert(false);
+        return 0;
+    }
+
+    out->Clear();
     MoveList pseudo_legal;
     MoveGenerator::GeneratePseudoLegal(*this, &pseudo_legal);
 
     const Color moving_color = side_to_move_;
     const Color opponent = Opposite(moving_color);
-    std::vector<Move> legal;
-    legal.reserve(pseudo_legal.Size());
+    Position* const mutable_this = const_cast<Position*>(this);
 
     for (const Move& move : pseudo_legal) {
         if (move.HasFlag(MoveFlag::CastleKing) ||
@@ -351,26 +340,35 @@ std::vector<Move> Position::LegalMoves() {
             }
         }
 
-        MakeMoveUnchecked(move);
-        const bool safe = !InCheck(moving_color);
-        UndoMove();
+        mutable_this->MakeMoveUnchecked(move);
+        const bool safe = !mutable_this->InCheck(moving_color);
+        const bool undone = mutable_this->UndoMove();
+        assert(undone);
+        (void)undone;
         if (safe) {
-            legal.push_back(move);
+            out->Add(move);
         }
     }
 
-    return legal;
+    return out->Size();
+}
+
+std::vector<Move> Position::LegalMoves() {
+    MoveList legal;
+    GenerateLegalMoves(&legal);
+    return std::vector<Move>(legal.begin(), legal.end());
 }
 
 std::vector<Move> Position::LegalMoves() const {
-    Position copy = *this;
-    copy.history_.clear();
-    return copy.LegalMoves();
+    MoveList legal;
+    GenerateLegalMoves(&legal);
+    return std::vector<Move>(legal.begin(), legal.end());
 }
 
 GameResult Position::Result() const {
-    const std::vector<Move> legal = LegalMoves();
-    if (!legal.empty()) {
+    MoveList legal;
+    GenerateLegalMoves(&legal);
+    if (!legal.Empty()) {
         if (halfmove_clock_ >= 100) {
             return GameResult::DrawFiftyMove;
         }
@@ -387,7 +385,8 @@ GameResult Position::Result() const {
 }
 
 std::optional<Move> Position::FindLegalMove(const Move& move) const {
-    const std::vector<Move> legal = LegalMoves();
+    MoveList legal;
+    GenerateLegalMoves(&legal);
     for (const Move& candidate : legal) {
         if (candidate.from == move.from && candidate.to == move.to &&
             candidate.promotion == move.promotion) {
@@ -407,6 +406,20 @@ bool Position::MakeMove(const Move& move) {
         return false;
     }
     MakeMoveUnchecked(*legal);
+    return true;
+}
+
+bool Position::MakeMoveAssumeLegal(const Move& move) {
+    // The legality check is debug-only. Release builds rely on the documented
+    // precondition to avoid repeating move generation on every search node.
+#ifndef NDEBUG
+    const std::optional<Move> legal = FindLegalMove(move);
+    if (!legal.has_value() || *legal != move) {
+        throw std::logic_error(
+            "MakeMoveAssumeLegal requires a legal move from this position");
+    }
+#endif
+    MakeMoveUnchecked(move);
     return true;
 }
 
@@ -591,6 +604,10 @@ void Position::MakeMoveUnchecked(const Move& move) {
         new_en_passant_file.has_value()) {
         hash_ ^= zobrist::EnPassantKey(*new_en_passant_file);
     }
+}
+
+void Position::ReserveHistory(std::size_t capacity) {
+    history_.reserve(capacity);
 }
 
 bool Position::UndoMove() {

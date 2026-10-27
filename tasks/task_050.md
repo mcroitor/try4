@@ -7,9 +7,7 @@
 | **Depends on** | 049 |
 | **Estimate** | 1 day |
 | **Priority** | P1 |
-| **Status** | Ready |
-
-**Blocker:** waiting for task 049. Flip to `Ready` when 049 is `Done`.
+| **Status** | Done |
 
 ## Objective
 
@@ -132,6 +130,34 @@ Expected: all suites pass before the search starts using the new API.
   without copies.
 - **Hidden copies.** `LegalMoves() const` must be rechecked with a profiler;
   equivalence tests do not catch allocations.
+
+## Completion notes
+
+- Added `Position::GenerateLegalMoves(MoveList*) const`,
+  `MakeMoveAssumeLegal`, `IsRepetition` and `ReserveHistory`.
+  `LegalMoves()`, `Result()` and `FindLegalMove()` now use the fixed-capacity
+  generation path; `LegalMoves() const` no longer copies the position.
+- `GenerateLegalMoves` preserves the pseudo-legal order and filters king safety
+  with temporary make/unmake. It is logically const and not reentrant; the
+  header documents the restoration and `ReserveHistory` contract.
+- Repetition detection is now a hash-history scan. The header records the
+  accepted 64-bit Zobrist collision policy and the existing `Result()` draw
+  precedence.
+- `MakeMoveAssumeLegal` performs its precondition check only in debug builds
+  and throws `std::logic_error` for an illegal or inexact move. Release builds
+  have no legality check.
+- Added `tests/position_primitives_tests.cpp`: 10,000 generated sequences,
+  1,000 make-transition comparisons, castling/en-passant/promotion fixtures,
+  repetition and fifty-move precedence, history reservation, and the debug
+  guard. CMake registers it as `try4_position_primitives` with the `property`
+  label.
+- Debug and Release full suites pass **24/24**. Release start-position depth 6
+  still reports **79,677 nodes** with the same PV; the observed time was 383 ms
+  on this host. ASan/UBSan were not run locally because MinGW does not provide
+  first-class ASan support; the repository's Linux CI job remains the sanitizer
+  gate.
+- Smallest next action: start task 051, using the new generation and unchecked
+  make path in `Negamax` and `Quiescence` without changing node counts.
 
 ## Completion report
 

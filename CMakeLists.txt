@@ -146,6 +146,7 @@ if(TRY4_BUILD_TESTS)
 
     try4_add_test(try4_types tests/types_tests.cpp unit)
     try4_add_test(try4_position tests/position_tests.cpp unit)
+    try4_add_test(try4_position_primitives tests/position_primitives_tests.cpp property)
     try4_add_test(try4_attack tests/attack_tests.cpp unit)
     try4_add_test(try4_movegen tests/movegen_tests.cpp unit)
     try4_add_test(try4_legal tests/legal_tests.cpp unit)
