@@ -5,7 +5,12 @@ only when its tag and release report exist.
 
 ## [Unreleased]
 
-No changes after 0.1.0.
+### Changed
+
+- UCI now emits one `info depth ...` line after each completed iterative-deepening
+  iteration instead of only a single line when the search finishes. A terminal
+  root, immediate stop, or zero budget still emits an `info depth 0` line before
+  `bestmove`.
 
 ## [0.1.0] — 2026-10-26
 

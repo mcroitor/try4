@@ -9,11 +9,10 @@
 #include <string_view>
 #include <vector>
 
+#include "chess/movegen.hpp"
 #include "chess/types.hpp"
 
 namespace chess {
-
-class MoveGenerator;
 
 class Position {
 public:
@@ -70,6 +69,14 @@ public:
     std::vector<Move> LegalMoves();
     std::vector<Move> LegalMoves() const;
 
+    // Fills out with the legal moves for the side to move, in exactly the same
+    // order as LegalMoves(), and returns the number of moves. No vector or
+    // Position copy is created. The method is logically const: it temporarily
+    // makes and unmakes each candidate move using this position's history, then
+    // restores the position. It is not thread-safe or reentrant. Call
+    // ReserveHistory() when the additional history capacity must be avoided.
+    std::size_t GenerateLegalMoves(MoveList* out) const;
+
     // True when move is in LegalMoves().
     bool IsLegal(const Move& move) const;
 
@@ -79,6 +86,26 @@ public:
 
     // Applies a legal move and returns false without changing state otherwise.
     bool MakeMove(const Move& move);
+
+    // Applies move without repeating legality generation. Precondition: move
+    // came from GenerateLegalMoves() or LegalMoves() for this exact position.
+    // Debug builds validate the precondition and throw std::logic_error for an
+    // illegal or inexact move; release builds do not check, and an illegal move
+    // can corrupt the position. The state transition and history push are
+    // identical to MakeMove(). Always returns true when the precondition holds.
+    bool MakeMoveAssumeLegal(const Move& move);
+
+    // True when the current position has appeared at least three times in the
+    // game history. This scan uses the incrementally maintained 64-bit Zobrist
+    // hash and does not copy positions. The hash covers piece placement, side
+    // to move, castling rights and the en-passant file; a 64-bit hash collision
+    // is therefore accepted as the same position. Result() applies the
+    // fifty-move rule, repetition and insufficient-material precedence.
+    bool IsRepetition() const;
+
+    // Reserves history capacity without changing HistoryDepth() or position
+    // state. Lower values do not shrink the existing capacity.
+    void ReserveHistory(std::size_t capacity);
 
     // Restores the position before the most recent make.
     // Returns false when there is no history.
@@ -130,7 +157,6 @@ private:
     std::optional<int> HashEnPassantFile() const;
     bool IsThreefoldRepetition() const;
     bool HasInsufficientMaterial() const;
-    bool SamePositionForRepetition(const Position& other) const;
     friend std::uint64_t Perft(Position& position, int depth);
 
     std::array<Piece, 128> board_{};

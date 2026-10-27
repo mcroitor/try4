@@ -108,9 +108,23 @@ class ProcessTests(unittest.TestCase):
         e.send("position startpos moves e2e4 illegal\ngo depth 1")
         self.assertEqual(e.until("bestmove "), "bestmove g5g7")
 
+    def test_info_streams_each_completed_depth(self):
+        e = self.engine()
+        e.send("position startpos\ngo depth 4")
+        e.until("bestmove ")
+        infos = [line for line in e.trace if line.startswith("info depth ")]
+        depths = [int(re.match(r"info depth (\d+) ", line).group(1)) for line in infos]
+        self.assertEqual(depths, [1, 2, 3, 4])
+        self.assertEqual(sum(line.startswith("bestmove ") for line in e.trace), 1)
+        for line in infos:
+            self.assertRegex(line, r" score (cp|mate) -?\d+ ")
+            self.assertRegex(line, r" nodes \d+ nps \d+ time \d+")
+            self.assertIn(" pv ", line)
+
     def test_infinite_terminal_result_waits_for_stop_and_isready_works(self):
         e = self.engine()
         e.send("position fen 7k/8/5K2/6Q1/8/8/8/8 w - - 0 1\ngo infinite")
+        e.until("info depth ")
         e.quiet(0.15)
         e.send("isready")
         self.assertEqual(e.until("readyok"), "readyok")
@@ -193,7 +207,7 @@ class ProcessTests(unittest.TestCase):
     def test_quit_during_search_exits_cleanly(self):
         e = self.engine()
         e.send("position startpos\ngo infinite")
-        e.quiet(0.10)
+        e.until("info depth ")
         start = time.monotonic()
         e.send("quit")
         e.process.wait(timeout=5)
