@@ -1,0 +1,8 @@
+#ifndef CHESS_VERSION_HPP_
+#define CHESS_VERSION_HPP_
+
+namespace chess {
+inline constexpr char kVersion[] = "@PROJECT_VERSION@";
+}  // namespace chess
+
+#endif  // CHESS_VERSION_HPP_
