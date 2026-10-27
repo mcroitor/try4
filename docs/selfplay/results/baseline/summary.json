@@ -1,0 +1,17 @@
+{
+  "label": "baseline",
+  "candidate": "full",
+  "baseline": "material",
+  "games": 4,
+  "wins": 3,
+  "losses": 0,
+  "draws": 1,
+  "score": 0.8750,
+  "elo": 338.0392,
+  "elo_margin_95": 389.1279,
+  "elo_clipped": false,
+  "as_white": {"wins": 2, "losses": 0, "draws": 0},
+  "as_black": {"wins": 1, "losses": 0, "draws": 1},
+  "terminations": "checkmate=3, threefold-repetition=1",
+  "sprt": {"elo1": 20.0, "llr": 0.1659, "lower": -2.9444, "upper": 2.9444, "decision": "continue"}
+}

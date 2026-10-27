@@ -1,0 +1,14 @@
+try4 self-play baseline
+candidate: full evaluation
+baseline: material only
+games: 4
+full W/D/L: 3/1/0
+full score: 0.8750
+full as White W/D/L: 2/0/0
+full as Black W/D/L: 1/1/0
+elo difference: +338.04
+95% margin: +/- 389.13
+terminations: checkmate=3, threefold-repetition=1
+full nodes: 141844
+material nodes: 139521
+sprt (H1 +20 Elo): llr=0.166 bounds=[-2.944, 2.944] decision=continue

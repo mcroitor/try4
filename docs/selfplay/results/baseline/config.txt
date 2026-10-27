@@ -1,0 +1,12 @@
+label=baseline
+candidate=full
+baseline=material
+openings_path=docs/selfplay/openings.txt
+nodes_per_move=1000
+movetime_ms=none
+max_plies=160
+tt_mb=16
+seed=1
+hardware=unspecified
+compiler=GNU 16.2.0
+build_type=Debug

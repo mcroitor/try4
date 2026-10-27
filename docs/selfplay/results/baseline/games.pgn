@@ -1,0 +1,48 @@
+[Event "try4 self-play"]
+[Site "local"]
+[Date "????.??.??"]
+[Round "1"]
+[White "full"]
+[Black "material"]
+[Result "1-0"]
+[Opening "italian"]
+[Termination "checkmate"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. Nc3 Bd6 5. O-O Nb8 6. d4 exd4 7. Qxd4 Bf8 8. Bg5 c5 9. Qe5+ Be7 10. Qxg7 d5 11. Qxh8 dxc4 12. Qxg8+ Kd7 13. Rad1+ Ke6 14. Rxd8 Bxd8 15. Qxd8 f6 16. Qxc8+ Ke7 17. Qxb7+ Nd7 18. Qxa8 fxg5 19. Nxg5 h6 20. Nf3 h5 21. Rd1 h4 22. Qxa7 Kf8 23. Qxd7 h3 24. g3 Kg8 25. e5 Kf8 26. a4 Kg8 27. a5 Kf8 28. a6 Kg8 29. a7 Kf8 30. a8=Q# 1-0
+
+[Event "try4 self-play"]
+[Site "local"]
+[Date "????.??.??"]
+[Round "2"]
+[White "material"]
+[Black "full"]
+[Result "0-1"]
+[Opening "italian"]
+[Termination "checkmate"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. Nc3 Nf6 5. Rb1 O-O 6. Ra1 d6 7. Rb1 Be6 8. Bxe6 fxe6 9. Ra1 Ng4 10. O-O d5 11. exd5 Bxf2+ 12. Rxf2 Nxf2 13. Kxf2 exd5 14. Rb1 Qd6 15. Ra1 e4 16. Nb5 Qc5+ 17. d4 Qxb5 18. a4 Qc4 19. b3 Qxd4+ 20. Qxd4 Nxd4 21. Be3 Nxc2 22. Ra2 Nxe3 23. Kxe3 exf3 24. gxf3 Rae8+ 25. Kf2 d4 26. Ra3 Re3 27. f4 Rxf4+ 28. Kg2 Rff3 29. Kg1 c5 30. Kg2 c4 31. Kg1 Re2 32. h3 cxb3 33. Ra1 b2 34. Rb1 g5 35. Kh1 d3 36. Kg1 d2 37. Rd1 Re1+ 38. Kg2 Rxd1 39. Kxf3 Re1 40. Kg3 d1=Q 41. Kg2 Qd5+ 42. Kg3 b1=Q 43. Kg4 Qbe4+ 44. Kg3 Qg2# 0-1
+
+[Event "try4 self-play"]
+[Site "local"]
+[Date "????.??.??"]
+[Round "3"]
+[White "full"]
+[Black "material"]
+[Result "1-0"]
+[Opening "ruy-lopez"]
+[Termination "checkmate"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6 bxc6 5. Nxe5 a5 6. Nc3 a4 7. O-O a3 8. bxa3 Bxa3 9. Bxa3 Rxa3 10. Qf3 f6 11. Qh5+ g6 12. Nxg6 hxg6 13. Qxh8 Kf8 14. Rab1 Ra5 15. a4 Rh5 16. Qxh5 gxh5 17. d4 h4 18. a5 d6 19. g3 hxg3 20. fxg3 c5 21. d5 c4 22. h4 Qd7 23. h5 Qg4 24. Rb8 Qxg3+ 25. Kh1 Qh4+ 26. Kg2 Qg5+ 27. Kf2 Qf4+ 28. Ke2 Qh2+ 29. Ke3 Qg3+ 30. Kd4 Qh3 31. Rg1 Ne7 32. a6 Qxh5 33. Kxc4 Qf7 34. a7 Qxd5+ 35. exd5 f5 36. a8=Q Kf7 37. Rxc8 Nxc8 38. Qxc8 c5 39. Qd7+ Kf8 40. Qe6 f4 41. Rg8# 1-0
+
+[Event "try4 self-play"]
+[Site "local"]
+[Date "????.??.??"]
+[Round "4"]
+[White "material"]
+[Black "full"]
+[Result "1/2-1/2"]
+[Opening "ruy-lopez"]
+[Termination "threefold-repetition"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6 dxc6 5. Nxe5 Nf6 6. Nc3 Qd4 7. Nf3 Qc4 8. Qe2 Be6 9. Qxc4 Bxc4 10. Rb1 Bc5 11. Ra1 O-O-O 12. Rb1 Kb8 13. Ra1 Rhe8 14. d3 Be6 15. Rb1 h5 16. Ra1 Bf5 17. Rb1 Nd5 18. Nxd5 cxd5 19. e5 Rd6 20. Ra1 h4 21. Nxh4 Rxe5+ 22. Kf1 Bg4 23. Rb1 Re2 24. f3 Rf2+ 25. Ke1 Re6+ 26. Kd1 Bh5 27. g4 Be7 28. Nf5 Bg6 29. Nxg7 Re5 30. Bf4 Ree2 31. Rc1 Rg2 32. Rg1 Rgf2 33. Rh1 Rg2 34. Rg1 Rgf2 35. Rf1 Rg2 36. Rh1 Bc5 37. Rf1 f6 38. Rh1 d4 39. Rg1 Rgf2 40. Rh1 Rg2 41. Rg1 Rgf2 42. Rh1 Rg2 1/2-1/2
+
