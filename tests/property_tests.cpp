@@ -19,15 +19,35 @@ constexpr std::uint64_t kSeed = 0x5EEDC0FFEEULL;
 constexpr int kDefaultGameCount = 10000;
 constexpr int kDefaultMaxPlies = 16;
 
+std::optional<std::string> EnvironmentValue(const char* name) {
+#ifdef _MSC_VER
+    char* raw = nullptr;
+    std::size_t length = 0;
+    if (_dupenv_s(&raw, &length, name) != 0 || raw == nullptr) {
+        return std::nullopt;
+    }
+    std::string value(raw);
+    std::free(raw);
+    return value;
+#else
+    const char* const raw = std::getenv(name);
+    if (raw == nullptr) {
+        return std::nullopt;
+    }
+    return std::string(raw);
+#endif
+}
+
 int PositiveEnvInt(const char* name, int fallback) {
-    const char* const value = std::getenv(name);
-    if (value == nullptr || value[0] == '\0') {
+    const std::optional<std::string> stored = EnvironmentValue(name);
+    if (!stored || stored->empty()) {
         return fallback;
     }
     int parsed = 0;
-    const char* const end = value + std::char_traits<char>::length(value);
+    const char* const begin = stored->data();
+    const char* const end = begin + stored->size();
     const std::from_chars_result result =
-        std::from_chars(value, end, parsed);
+        std::from_chars(begin, end, parsed);
     if (result.ec != std::errc{} || result.ptr != end || parsed <= 0) {
         return fallback;
     }
