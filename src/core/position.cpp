@@ -319,12 +319,19 @@ std::size_t Position::GenerateLegalMoves(MoveList* out) const {
 
     const Color moving_color = side_to_move_;
     const Color opponent = Opposite(moving_color);
+    // King-square scanning is O(64) and it used to be called once per
+    // candidate move. The king only moves for king moves, so it is enough to
+    // compute it once per generation.
+    const std::optional<Square> king_before = KingSquare(moving_color);
+    if (!king_before.has_value()) {
+        return out->Size();
+    }
     Position* const mutable_this = const_cast<Position*>(this);
 
     for (const Move& move : pseudo_legal) {
         if (move.HasFlag(MoveFlag::CastleKing) ||
             move.HasFlag(MoveFlag::CastleQueen)) {
-            if (InCheck(moving_color)) {
+            if (king_before.has_value() && IsSquareAttacked(*king_before, opponent)) {
                 continue;
             }
 
@@ -340,8 +347,12 @@ std::size_t Position::GenerateLegalMoves(MoveList* out) const {
             }
         }
 
+        const Piece moving_piece = board_[static_cast<std::size_t>(To0x88(move.from))];
+        const Square king_after =
+            moving_piece.Type() == PieceType::King ? move.to : *king_before;
+
         mutable_this->MakeMoveUnchecked(move);
-        const bool safe = !mutable_this->InCheck(moving_color);
+        const bool safe = !IsSquareAttacked(king_after, opponent);
         const bool undone = mutable_this->UndoMove();
         assert(undone);
         (void)undone;

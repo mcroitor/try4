@@ -1,0 +1,59 @@
+tactical-scholar	1	fen r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1	mate 1	89	f3f7	f3f7
+tactical-kqk	3	fen 7k/8/8/4K3/8/8/8/6Q1 w - - 0 1	mate 2	1965	e5f6	e5f6 h8h7 g1g7
+tactical-krk	5	fen 7k/8/8/4K3/8/8/8/R7 w - - 0 1	mate 3	17551	e5f6	e5f6 h8g8 a1h1
+tactical-hanging-queen	2	fen rnb1kbnr/pppp1ppp/8/4p3/4P2q/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 1	cp 876	231	f3h4	f3h4 b8c6
+tactical-stalemate	2	fen 7k/8/5K2/6Q1/8/8/8/8 w - - 0 1	mate 1	55	g5g7	g5g7
+tactical-kiwipete	3	fen r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1	cp 51	22400	e2a6	e2a6 e6d5 e5g6 f7g6
+tactical-perft3	3	fen 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1	cp 72	649	b4f4	b4f4 h4g3 f4f7
+tactical-quiescence	3	fen 4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1	cp 621	1194	d1d4	d1d4 e8d7 e1e2
+bench-startpos	4	fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1	cp 10	3556	b1c3	b1c3 b8c6 g1f3 g8f6
+bench-kiwipete	4	fen r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1	cp 51	53219	e2a6	e2a6 e6d5 e5g6 f7g6
+bench-rook	4	fen 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1	cp 93	1832	b4f4	b4f4 h4g3 f4c4 c7c5
+bench-promotion	4	fen rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8	cp 521	18579	d7c8q	d7c8q d8c8 e1f2 c8g4
+bench-middlegame	4	fen r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10	cp 69	53911	c3d5	c3d5 e7d8 d5f6 g7f6
+bench-queen	4	fen 8/8/4k3/8/8/4K3/8/6Q1 w - - 0 1	cp 996	3671	e3e4	e3e4 e6f6 g1b6 f6g5
+bench-in-check	4	fen rnbqk2r/pppp1ppp/4p3/8/1b1PP3/8/PPP2PPP/RNBQKBNR w KQkq - 1 3	cp 301	11397	c2c3	c2c3 b4e7 d1g4 e8g8
+bench-kp-blockade	4	fen 8/8/4k3/4p3/4P3/4K3/8/8 w - - 0 1	cp 10	353	e3d3	e3d3 e6d6 d3e3 d6e6
+draw-fifty-root	3	fen 4k3/8/8/8/8/8/4P3/4K3 w - - 100 1	cp 0	0	e1f1	e1f1
+terminal-root	3	fen 7k/6Q1/6K1/8/8/8/8/8 b - - 0 1	mate 0	0	0000	
+insufficient-root	3	fen 7k/8/8/8/8/8/8/K7 w - - 0 1	cp 0	0	a1b1	a1b1
+random-00	4	startpos moves e2e3 b8c6 d2d4 a7a6 d4d5 c6b8 g1h3 a6a5 e1d2 g8f6	cp 15	14413	b1c3	b1c3 b8a6 h3g5 a6c5
+random-01	4	startpos moves b2b4 f7f5 e2e4 a7a6 c2c3 g8f6 f1c4 b7b5 h2h4 f6g4 d2d4 g4h6 f2f3 a6a5 c4d5 c7c5 e1d2 a5a4 b1a3 b8a6 d4c5 a6c7	cp 470	11334	d5a8	d5a8 c7a8 a3b5 f5e4 f3e4
+random-02	4	startpos moves g1h3 a7a5 g2g3 g7g5 c2c3 b8a6 e2e3 a8b8 d1e2 g8h6 a2a4 h6g4 e2c4 a6b4 c4c7 b4a2 c7d7 c8d7 b2b3	cp 1085	13062	a2c1	a2c1 h3g5 e7e5 h2h4 c1b3
+random-03	4	startpos moves g1h3 e7e6 d2d3 d8h4 g2g3 h4g3 e2e4 g3d3 c2c4 d3d6 f1d3 g8e7	cp -193	17518	b1c3	b1c3 b8c6 c1f4 c6e5
+random-04	4	startpos moves h2h3 c7c5 e2e4 g7g5 f1d3 f8h6 d1g4 b7b6 e1f1 g8f6 g4f4 e8g8 b1a3 e7e5 f4f3	cp 42	11832	b8c6	b8c6 g1e2 d7d6 a3c4
+random-05	4	startpos moves g2g4 b8a6 e2e4 a6c5 a2a3 h7h6 g1h3 h6h5 d1f3 h5h4	cp 89	23548	h3g5	h3g5 f7f6 d2d4 f6g5 d4c5
+random-06	4	startpos moves h2h4 c7c6 c2c3 g7g5 d2d3 f8h6 g1f3 f7f5 b1a3 g5g4 f3h2 h6c1 d1c2 d7d5 g2g3 b7b5 c2b1 c1g5 h2f3	cp 345	12183	g5f6	g5f6 f3d4 e7e5 d4b3
+random-07	4	startpos moves g2g4 g7g5 e2e3 a7a6 f1c4	cp 3	10260	d7d5	d7d5 c4e2 b8c6 b1c3
+random-08	4	startpos moves b2b4 d7d6 g1h3 h7h6 e2e3 h8h7 h3g5 d6d5 h2h4 c8g4 h1g1 e8d7 f1c4	cp 334	10850	g4d1	g4d1 g5h7 d5c4 e1d1
+random-09	4	startpos moves b1c3 c7c5 h2h4 d8b6 a1b1 b8c6 g1f3 a7a5 h1h3 e7e5 c3b5 a8b8 c2c4 c6e7 b5c7 b6c7 h4h5 c7c6	cp -276	16324	f3e5	f3e5 c6e4 e5d3 e4c4
+random-10	4	startpos moves e2e3 b7b5 h2h4 a7a6 g1h3 a8a7 h3g5 a6a5 f1d3 b8c6 f2f3 e7e5 h1h3 g8h6 c2c3 c6b8 a2a3	cp -95	54724	c7c6	c7c6 d3h7 f8e7 f3f4 e7g5 h4g5 h8h7 g5h6
+random-11	4	startpos moves a2a3 b8c6 e2e3 g8f6 g2g4 g7g6 g1f3 b7b5 d2d3 b5b4 f1h3	cp 40	23451	d7d6	d7d6 h1g1 a8b8 a3b4 b8b4
+random-12	4	startpos moves a2a3 b7b6 c2c4 f7f5 g2g4 h7h6 g1h3 e7e5 h3g5 f8c5 b1c3 g7g6 e2e3 c5f8 f1e2 b8a6 g5f3	cp -95	19313	e5e4	e5e4 f3d4 c7c5 d4b5
+random-13	4	startpos moves d2d4 e7e6 c1e3 b8a6 g1f3 g8h6 f3g5 f7f6 d1c1 c7c6 h2h4 f6f5 b2b3 d8c7 c1d2 c7e5 f2f4	cp -42	12291	e5f6	e5f6 b1c3 h6g4 e1c1 g4e3 d2e3
+random-14	4	startpos moves g2g3 d7d5 f1h3 d8d7 c2c3 e7e5 e1f1 c7c5 f2f4 d7e6 d2d4 c8d7 f1f2 d7c6 d1f1 e6d6 b1d2	cp 78	23179	e5f4	e5f4 g1f3 g8e7 f3e5
+random-15	4	startpos moves b1a3 f7f6 g1h3 g7g5 b2b4 e7e6 b4b5 c7c6 h1g1 g8e7 g1h1 c6b5 c2c4 d7d5 h3g1 g5g4 d1c2 d5c4 a3b5 d8b6 b5c3 b6b2 c3e4	cp 829	7274	b2c2	b2c2 e4f6 e8d8 f6g4
+random-16	4	startpos moves f2f3 a7a6 f3f4 h7h5 e1f2 h8h6 f2f3	cp 101	6657	b8c6	b8c6 b1c3 g8f6 e2e4
+random-17	4	startpos moves h2h4 c7c5 g2g3 f7f5 h1h2 d8a5 c2c4 g8h6 b2b3 a5a4 b1c3 d7d5	cp 887	8161	c3a4	c3a4 h6g4 h2h1 e7e6 c4d5 e6d5
+random-18	4	startpos moves h2h4 f7f6 c2c4 d7d6 d1a4 c7c6 a4c6 c8d7 g1f3 b8a6 c6c8 h7h5 c8c5	cp 797	8687	a6c5	a6c5 b1c3 d8b6 c3d5
+random-19	4	startpos moves a2a3 g7g5 f2f4 f7f5 b1c3 g5f4 h2h3	cp 69	8407	e7e6	e7e6 g1f3 b8c6 e2e3
+random-20	4	startpos moves b2b4 c7c6 c2c4 d7d6 d2d4 c8f5 c1g5 f5g6 g5f4 g8h6 d1c1 h6g8 b4b5 g6b1 c1c3 d8c7 f4e5 c6b5 c3b2 a7a5 e5g3 g8f6 b2b3	cp 328	16627	b1e4	b1e4 c4b5 b8d7 g1f3
+random-21	4	startpos moves h2h3 d7d6 f2f3 g7g6 g2g3 c8e6 b2b4 f8h6 h3h4 f7f5 h4h5 e6c8 a2a3 f5f4 h1h4 g6h5 f1g2 d8d7 g3f4 d7h3 f4f5	cp 874	11534	h3g2	h3g2 e2e4 g2g3 e1e2 g3h4
+random-22	4	startpos moves e2e3 c7c5 g1e2 a7a5 a2a3 g7g6 e3e4 b7b6 h2h4	cp 2	6055	b8c6	b8c6 b1c3 g8f6 e2f4
+random-23	4	startpos moves g2g4 f7f6 c2c3 f6f5 d1c2 g8f6 g1f3 c7c5 e2e4 b8a6 c3c4 a6b8 d2d4 g7g5	cp 98	19646	e4f5	e4f5 c5d4 f3d4 b8c6
+random-24	4	startpos moves e2e4 g7g5 c2c3 f8g7 f1a6 f7f5 d1b3 g8f6 d2d3 h7h5 b3e6 f6h7 e6b3 d7d6 b3d5 b7a6 d5f7 e8f7 h2h3 c8b7 b1d2	cp 1225	19271	e7e6	e7e6 g1f3 b8c6 e1g1
+random-25	4	startpos moves g2g4 g8f6 h2h4 h7h5 c2c4 b7b5 c4c5 d7d5 d1a4 c7c6 a4d4 e8d7 f1h3 b5b4 d2d3 e7e6 h3g2 e6e5 c1h6 d8a5 g2d5 d7d8	cp -140	23184	d4e5	d4e5 a5c5 h6g5 c5d5 g5f6 g7f6 e5f6 d8e8 f6h8 d5h1
+random-26	4	startpos moves f2f3 e7e6 e2e3 d7d5 d1e2 c7c6 e2a6 b8d7 b1a3 d8e7 g2g4 e6e5 e1f2 e7d8 a6c6 e8e7 c6g6 d8e8	cp 110	13519	g6d3	g6d3 d7b6 a3b5 g8f6
+random-27	4	startpos moves h2h4 g7g5 f2f4 a7a6 d2d3 d7d5 b1c3 d8d6 e2e3 b8d7 g1h3 d6f6 e1d2 e7e6 a1b1 f6g6 b2b3 g5h4 a2a3	cp 68	96962	f8g7	f8g7 h3g5 h7h6 g5f3
+random-28	4	startpos moves c2c3 b7b5 d2d3 c8a6 f2f4 c7c5 e2e4 a6b7 e1f2 f7f5 g2g3 e7e5 e4f5 b7f3 d3d4 d8b6 a2a3 e8f7 f1e2 b6c6 d1e1	cp 221	35420	f3h1	f3h1 f4e5 c5d4 c3d4
+random-29	4	startpos moves a2a3 f7f6 a1a2 d7d6 e2e4 b7b5 d1h5 e8d7 h5h3 d7c6	cp 184	11745	h3b3	h3b3 c6d7 f1b5 b8c6
+random-30	4	startpos moves b1a3 h7h6 f2f4 b7b6 e1f2 c8b7 a1b1 b7f3	cp 326	5181	g1f3	g1f3 g8f6 f2g1 b8c6
+random-31	4	startpos moves e2e4 g8h6 f1d3 h8g8 d3b5 a7a5 d1f3 f7f5 b5a6 a8a7 a6d3 c7c5 f3g3	cp -69	10410	d7d6	d7d6 b1c3 b8c6 g1f3 f5e4 c3e4
+random-32	4	startpos moves f2f4 e7e5 c2c3 c7c6 d1b3 d7d6 f4e5 c6c5 b3b7	cp 733	9297	c8b7	c8b7 g1f3 b8c6 e5d6 d8d6
+random-33	4	startpos moves f2f3 b7b6 b1c3 f7f6 c3b5 d7d5 a2a4 c8g4 e2e3 h7h6 f1e2 g7g5 e1f1	cp -67	14787	g4f5	g4f5 b5d4 f5g6 g1h3
+random-34	4	startpos moves h2h4 e7e6 g2g4 g8f6 b1c3	cp 71	8585	f6g4	f6g4 e2e3 h7h5 d1f3
+random-35	4	startpos moves f2f3 b7b6 b1c3 f7f5 e1f2 d7d6 c3b1 g7g6 g2g4 g6g5 f2e3 c8a6 b1a3 h7h6 d2d3	cp 105	9228	f5g4	f5g4 f3g4 g8f6 e3f3
+random-36	4	startpos moves h2h3 g7g6 b1c3 d7d6 c3e4 h7h6 b2b4 f8g7 a2a3 c7c5 c2c3 g7e5	cp 115	18715	g1f3	g1f3 c5c4 f3e5 d6e5
+random-37	4	startpos moves f2f4 b8a6 c2c4 a8b8 d1a4 c7c5 a4d1 g8h6 b2b3 a6c7 b1a3 c7a6 a3b5	cp -14	7732	d8b6	d8b6 g1f3 h6g4 c1b2
+random-38	4	startpos moves a2a3 b8a6 g1f3 g8h6 h1g1 a6c5	cp 27	8771	d2d4	d2d4 c5e6 d4d5 e6c5
+random-39	4	startpos moves e2e4 f7f6 f1e2 e7e6 f2f4 f8d6 g1h3 g8h6 d2d4 a7a6 e2g4 h8f8 b2b3 a8a7 c2c3 e8f7 a2a3	cp 33	20291	h6g4	h6g4 d1g4 b8c6 e1g1
