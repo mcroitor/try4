@@ -232,6 +232,21 @@ TEST_CASE("node limits and pre-set stop return a legal fallback", "[search]") {
     REQUIRE(position.IsLegal(*stopped_info.bestMove));
 }
 
+TEST_CASE("root insufficient material still gives a legal draw move",
+          "[search][draw]") {
+    chess::Position position = FromFen("7k/8/8/8/8/8/8/K7 w - - 0 1");
+    chess::SearchLimits limits;
+    limits.depth = 1;
+    std::atomic_bool stop{false};
+    const chess::SearchInfo info = chess::Searcher().Search(
+        position, limits, stop);
+
+    CHECK(info.scoreCp == 0);
+    REQUIRE(info.bestMove.has_value());
+    REQUIRE_FALSE(info.pv.empty());
+    REQUIRE(info.bestMove->ToUci() == info.pv.front().ToUci());
+}
+
 TEST_CASE("a drawn root reports a draw score without losing the legal move",
           "[search]") {
     const chess::Position position =

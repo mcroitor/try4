@@ -28,7 +28,19 @@ public:
     bool Empty() const { return size_ == 0; }
     std::size_t Size() const { return size_; }
 
+    // Low-level in-place compaction helper for allocation-free search. The
+    // caller is responsible for providing a valid index range.
+    void Resize(std::size_t size) {
+        assert(size <= kCapacity);
+        size_ = size;
+    }
+
     const Move& operator[](std::size_t index) const {
+        assert(index < size_);
+        return moves_[index];
+    }
+
+    Move& operator[](std::size_t index) {
         assert(index < size_);
         return moves_[index];
     }
@@ -37,7 +49,7 @@ public:
     const Move* end() const { return moves_.data() + size_; }
 
 private:
-    std::array<Move, kCapacity> moves_{};
+    std::array<Move, kCapacity> moves_;
     std::size_t size_ = 0;
 };
 

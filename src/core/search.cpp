@@ -1,6 +1,7 @@
 #include "chess/search.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -53,6 +54,16 @@ struct SearchContext {
 
     Move killers[kMaxPly][2] = {};
     int history[2][64][64] = {};
+
+    // Triangular PV table. Row `ply` is only written by the node at that ply
+    // and read by its parent; rows 1..kMaxPly-1 are therefore safe to reuse.
+    // The line is converted to a vector only at the root of Search().
+    Move pv[kMaxPly][kMaxPly] = {};
+    std::size_t pv_length[kMaxPly] = {};
+
+    // One preallocated move list per ply; the search reuses them in place and
+    // avoids allocating or zero-initializing a fresh MoveList per node.
+    MoveList moves[kMaxPly] = {};
 
     std::optional<Clock::time_point> soft_deadline;
     std::optional<Clock::time_point> hard_deadline;
@@ -118,13 +129,6 @@ struct SearchContext {
     }
 };
 
-int TerminalScore(GameResult result, int ply) {
-    if (result == GameResult::Checkmate) {
-        return -kMateScore + ply;
-    }
-    return 0;
-}
-
 // The Zobrist hash deliberately excludes the halfmove clock, which is correct
 // for repetition but not for fifty-move semantics. Mix it into the TT key so a
 // score cached near the fifty-move boundary cannot leak into a fresh position.
@@ -175,33 +179,72 @@ int MoveOrderScore(const Position& position, const Move& move, int ply,
     return score;
 }
 
+struct SortedMove {
+    Move move;
+    int score = 0;
+    std::size_t index = 0;
+};
+
 // Stable sorting keeps the legal-move generator's order for equal scores, so
-// fixed-depth searches remain deterministic.
-void OrderMoves(const Position& position, std::vector<Move>* moves, int ply,
+// fixed-depth searches remain deterministic. Sorting is done in place over a
+// stack buffer: no heap allocation is allowed inside the search hot path.
+void OrderMoves(const Position& position, MoveList* moves, int ply,
                 const SearchContext& context, const Move& hash_move) {
-    if (!context.use_move_ordering || moves->size() < 2) {
+    if (!context.use_move_ordering || moves->Size() < 2) {
         return;
     }
-    std::stable_sort(
-        moves->begin(), moves->end(),
-        [&position, ply, &context, &hash_move](const Move& lhs,
-                                               const Move& rhs) {
-            return MoveOrderScore(position, lhs, ply, context, hash_move) >
-                   MoveOrderScore(position, rhs, ply, context, hash_move);
+
+    const std::size_t count = moves->Size();
+    assert(count <= MoveList::kCapacity);
+    SortedMove sorted[MoveList::kCapacity];
+    for (std::size_t index = 0; index < count; ++index) {
+        sorted[index].move = (*moves)[index];
+        sorted[index].score =
+            MoveOrderScore(position, sorted[index].move, ply, context, hash_move);
+        sorted[index].index = index;
+    }
+
+    std::sort(
+        sorted, sorted + count, [](const SortedMove& lhs, const SortedMove& rhs) {
+            if (lhs.score != rhs.score) {
+                return lhs.score > rhs.score;
+            }
+            return lhs.index < rhs.index;
         });
+
+    moves->Clear();
+    for (std::size_t index = 0; index < count; ++index) {
+        moves->Add(sorted[index].move);
+    }
 }
 
 int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
-               SearchContext& context, std::vector<Move>* pv) {
-    pv->clear();
+               SearchContext& context) {
+    context.pv_length[ply] = 0;
     ++context.nodes;
     if (context.ShouldStop()) {
         return 0;
     }
 
-    const GameResult result = position.Result();
-    if (result != GameResult::Ongoing) {
-        return TerminalScore(result, ply);
+    MoveList& moves = context.moves[ply];
+    if (moves.Empty()) {
+        position.GenerateLegalMoves(&moves);
+    }
+
+    // Cheap terminal/draw checks replace the expensive per-node Result() call.
+    // The original `Result()` precedence is preserved here as far as the
+    // interior search is concerned; insufficient material remains a root-only
+    // draw contract (see Search()).
+    if (moves.Empty()) {
+        return position.InCheck(position.SideToMove())
+                   ? -kMateScore + ply
+                   : 0;
+    }
+    if (position.HalfmoveClock() >= 100) {
+        return 0;
+    }
+    if (position.IsRepetition()) {
+        return 0;
     }
 
     if (ply >= kMaxPly - 1) {
@@ -218,28 +261,39 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
         return 0;
     }
 
-    std::vector<Move> moves = position.LegalMoves();
-    if (moves.empty()) {
-        return in_check ? -kMateScore + ply : 0;
-    }
-
     int best = -kInfinity;
     if (!in_check) {
-        moves.erase(std::remove_if(moves.begin(), moves.end(),
-                                   [&position, &context](const Move& move) {
-                                       if (context.stop.load() || context.HardExpired()) {
-                                           context.aborted = true;
-                                           return true;
-                                       }
-                                       if (IsTactical(move)) { return false; }
-                                       if (!context.forcing.checks) { return true; }
-                                       if (!position.MakeMove(move)) { return true; }
-                                       const bool gives_check = position.InCheck(position.SideToMove());
-                                       position.UndoMove();
-                                       return !gives_check;
-                                   }),
-                     moves.end());
-        if (context.aborted) { return 0; }
+        std::size_t kept = 0;
+        const std::size_t count = moves.Size();
+        for (std::size_t index = 0; index < count; ++index) {
+            const Move move = moves[index];
+            if (context.stop.load() || context.HardExpired()) {
+                context.aborted = true;
+                return 0;
+            }
+
+            if (IsTactical(move)) {
+                moves[kept++] = move;
+                continue;
+            }
+            if (!context.forcing.checks) {
+                continue;
+            }
+
+            position.MakeMoveAssumeLegal(move);
+            const bool gives_check =
+                position.InCheck(position.SideToMove());
+            position.UndoMove();
+            if (gives_check) {
+                moves[kept++] = move;
+            }
+        }
+        moves.Resize(kept);
+
+        if (context.aborted) {
+            return 0;
+        }
+
         const int stand_pat = context.StaticEvaluation(position);
         if (stand_pat >= beta) {
             return stand_pat;
@@ -252,15 +306,12 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
 
     OrderMoves(position, &moves, ply, context, Move{});
 
-    std::vector<Move> best_line;
-    for (const Move& move : moves) {
-        if (!position.MakeMove(move)) {
-            continue;
-        }
-        std::vector<Move> child_line;
-        const int score =
-            -Quiescence(position, -beta, -alpha, ply + 1, qply + 1, context,
-                        &child_line);
+    for (std::size_t index = 0; index < moves.Size(); ++index) {
+        const Move move = moves[index];
+        position.MakeMoveAssumeLegal(move);
+        context.moves[ply + 1].Clear();
+        const int score = -Quiescence(position, -beta, -alpha, ply + 1,
+                                      qply + 1, context);
         position.UndoMove();
 
         if (context.aborted) {
@@ -268,10 +319,12 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
         }
         if (score > best) {
             best = score;
-            best_line.clear();
-            best_line.push_back(move);
-            best_line.insert(best_line.end(), child_line.begin(),
-                             child_line.end());
+            context.pv[ply][0] = move;
+            const std::size_t child_length = context.pv_length[ply + 1];
+            for (std::size_t offset = 0; offset < child_length; ++offset) {
+                context.pv[ply][offset + 1] = context.pv[ply + 1][offset];
+            }
+            context.pv_length[ply] = child_length + 1;
         }
         if (best > alpha) {
             alpha = best;
@@ -281,28 +334,41 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
         }
     }
 
-    *pv = std::move(best_line);
     return best;
 }
 
-// Fail-soft negamax. `pv` belongs to the caller and is cleared when the node has
-// no continuation. A stopped search returns zero and is discarded by the root.
 int Negamax(Position& position, int depth, int alpha, int beta, int ply,
-            SearchContext& context, std::vector<Move>* pv) {
-    pv->clear();
+            SearchContext& context) {
+    context.pv_length[ply] = 0;
     ++context.nodes;
     if (context.ShouldStop()) {
         return 0;
     }
 
-    const GameResult result = position.Result();
-    if (result != GameResult::Ongoing) {
-        return TerminalScore(result, ply);
+    MoveList& moves = context.moves[ply];
+    if (moves.Empty()) {
+        position.GenerateLegalMoves(&moves);
+    }
+
+    // Cheap terminal/draw checks replace the expensive per-node Result() call.
+    // The original `Result()` precedence is preserved here as far as the
+    // interior search is concerned; insufficient material remains a root-only
+    // draw contract (see Search()).
+    if (moves.Empty()) {
+        return position.InCheck(position.SideToMove())
+                   ? -kMateScore + ply
+                   : 0;
+    }
+    if (position.HalfmoveClock() >= 100) {
+        return 0;
+    }
+    if (position.IsRepetition()) {
+        return 0;
     }
 
     if (depth <= 0) {
         if (context.use_quiescence) {
-            return Quiescence(position, alpha, beta, ply, 0, context, pv);
+            return Quiescence(position, alpha, beta, ply, 0, context);
         }
         return context.StaticEvaluation(position);
     }
@@ -326,28 +392,23 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         }
     }
 
-    std::vector<Move> moves = position.LegalMoves();
-    if (moves.empty()) {
-        // Result() should have classified this position, but keep the search
-        // safe if a future position invariant is temporarily violated.
-        return position.InCheck(position.SideToMove()) ? -kMateScore + ply : 0;
-    }
     OrderMoves(position, &moves, ply, context, hash_move);
 
     const int alpha_original = alpha;
     int best = -kInfinity;
-    std::vector<Move> best_line;
+#ifndef NDEBUG
+    const std::size_t history_depth = position.HistoryDepth();
+#endif
 
-    for (const Move& move : moves) {
+    for (std::size_t index = 0; index < moves.Size(); ++index) {
+        const Move move = moves[index];
         const Color mover = position.SideToMove();
         const bool tactical = IsTactical(move);
-        if (!position.MakeMove(move)) {
-            continue;
-        }
+        position.MakeMoveAssumeLegal(move);
 
-        std::vector<Move> child_line;
+        context.moves[ply + 1].Clear();
         const int score = -Negamax(position, depth - 1, -beta, -alpha,
-                                   ply + 1, context, &child_line);
+                                   ply + 1, context);
         position.UndoMove();
 
         if (context.aborted) {
@@ -355,10 +416,12 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         }
         if (score > best) {
             best = score;
-            best_line.clear();
-            best_line.push_back(move);
-            best_line.insert(best_line.end(), child_line.begin(),
-                             child_line.end());
+            context.pv[ply][0] = move;
+            const std::size_t child_length = context.pv_length[ply + 1];
+            for (std::size_t offset = 0; offset < child_length; ++offset) {
+                context.pv[ply][offset + 1] = context.pv[ply + 1][offset];
+            }
+            context.pv_length[ply] = child_length + 1;
         }
         if (best > alpha) {
             alpha = best;
@@ -371,19 +434,23 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         }
     }
 
+#ifndef NDEBUG
+    assert(position.HistoryDepth() == history_depth);
+#endif
+
     if (context.use_transposition_table && context.table != nullptr &&
-        !best_line.empty() && !context.aborted) {
+        context.pv_length[ply] > 0 && !context.aborted) {
         TTBound bound = TTBound::Exact;
         if (best <= alpha_original) {
             bound = TTBound::Upper;
         } else if (best >= beta) {
             bound = TTBound::Lower;
         }
-        context.table->Store(SearchTTKey(position), depth, ScoreToTT(best, ply),
-                             bound, best_line.front());
+        context.table->Store(SearchTTKey(position), depth,
+                             ScoreToTT(best, ply), bound,
+                             context.pv[ply][0]);
     }
 
-    *pv = std::move(best_line);
     return best;
 }
 
@@ -420,8 +487,9 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
     Position root = position;
 
     const GameResult root_result = root.Result();
-    const std::vector<Move> root_moves = root.LegalMoves();
-    if (root_result == GameResult::Checkmate || root_moves.empty()) {
+    MoveList root_moves;
+    root.GenerateLegalMoves(&root_moves);
+    if (root_result == GameResult::Checkmate || root_moves.Empty()) {
         info.scoreCp = root_result == GameResult::Checkmate ||
                                root.InCheck(root.SideToMove())
                            ? -kMateScore
@@ -431,8 +499,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
 
     // A legal fallback is available even if the caller supplied a zero node
     // budget or the stop flag was already set.
-    info.bestMove = root_moves.front();
-    info.pv.push_back(root_moves.front());
+    info.bestMove = root_moves[0];
+    info.pv.push_back(root_moves[0]);
     info.scoreCp = root_result == GameResult::Ongoing
                        ? (limits.evaluationMode == EvaluationMode::Material
                               ? EvaluateMaterial(root, limits.evaluation)
@@ -465,8 +533,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
     }
 
     SearchContext context(stop, node_limit, limits.useMoveOrdering,
-                          limits.useQuiescence,
-                          limits.useTranspositionTable, &table_);
+                          limits.useQuiescence, limits.useTranspositionTable,
+                          &table_);
     context.evaluation_mode = limits.evaluationMode;
     context.evaluation = limits.evaluation;
     context.forcing = limits.forcing;
@@ -479,6 +547,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             start + std::chrono::milliseconds(*budget.hardMs);
     }
 
+    root.ReserveHistory(root.HistoryDepth() + static_cast<std::size_t>(kMaxPly));
+
     for (int depth = 1; depth <= requested_depth; ++depth) {
         if (stop.load(std::memory_order_relaxed) || context.HardExpired()) {
             break;
@@ -487,21 +557,22 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             break;
         }
 
-        std::vector<Move> pv;
-        const int score =
-            Negamax(root, depth, -kInfinity, kInfinity, 0, context, &pv);
+        context.moves[0].Clear();
+        const int score = Negamax(root, depth, -kInfinity, kInfinity, 0,
+                                  context);
         info.nodes = context.nodes;
         if (context.aborted) {
             break;
         }
-        if (pv.empty()) {
+        const std::size_t pv_length = context.pv_length[0];
+        if (pv_length == 0) {
             break;
         }
 
         info.depth = depth;
         info.scoreCp = score;
-        info.pv = pv;
-        info.bestMove = pv.front();
+        info.pv.assign(context.pv[0], context.pv[0] + pv_length);
+        info.bestMove = info.pv.front();
 
         if (on_progress) {
             on_progress(info);
