@@ -39,6 +39,12 @@ bool IsTactical(const Move& move) {
 
 using Clock = std::chrono::steady_clock;
 
+struct StagedMoveOrder {
+    int scores[MoveList::kCapacity] = {};
+    std::size_t indices[MoveList::kCapacity] = {};
+    std::size_t next = 0;
+};
+
 struct SearchContext {
     std::uint64_t nodes = 0;
     std::optional<std::uint64_t> node_limit;
@@ -54,6 +60,10 @@ struct SearchContext {
 
     Move killers[kMaxPly][2] = {};
     int history[2][64][64] = {};
+
+    // Lazy move picker state, staged per ply. Scores are computed once and the
+    // picker swaps in the best remaining candidate on demand.
+    StagedMoveOrder order[kMaxPly];
 
     // Triangular PV table. Row `ply` is only written by the node at that ply
     // and read by its parent; rows 1..kMaxPly-1 are therefore safe to reuse.
@@ -179,43 +189,57 @@ int MoveOrderScore(const Position& position, const Move& move, int ply,
     return score;
 }
 
-struct SortedMove {
-    Move move;
-    int score = 0;
-    std::size_t index = 0;
-};
-
-// Stable sorting keeps the legal-move generator's order for equal scores, so
-// fixed-depth searches remain deterministic. Sorting is done in place over a
-// stack buffer: no heap allocation is allowed inside the search hot path.
-void OrderMoves(const Position& position, MoveList* moves, int ply,
-                const SearchContext& context, const Move& hash_move) {
-    if (!context.use_move_ordering || moves->Size() < 2) {
-        return;
-    }
-
+// The picker is score-once: the ordering key is evaluated one time per move.
+// The remaining candidates are then selected lazily with a stable maximum
+// selection, which preserves the current ordering policy and avoids paying for
+// candidates that are never searched because of an early cutoff.
+//
+// Stages encoded by `MoveOrderScore` are:
+// hash move, MVV-LVA captures, promotions, killers, and history-ordered quiet
+// moves. Equal scores stay deterministic by the generator's original index.
+void StageMoveOrder(const Position& position, MoveList* moves, int ply,
+                    SearchContext& context, const Move& hash_move) {
     const std::size_t count = moves->Size();
     assert(count <= MoveList::kCapacity);
-    SortedMove sorted[MoveList::kCapacity];
+    assert(ply >= 0 && ply < kMaxPly);
+    StagedMoveOrder& order = context.order[ply];
+    order.next = 0;
+    if (!context.use_move_ordering) {
+        return;
+    }
     for (std::size_t index = 0; index < count; ++index) {
-        sorted[index].move = (*moves)[index];
-        sorted[index].score =
-            MoveOrderScore(position, sorted[index].move, ply, context, hash_move);
-        sorted[index].index = index;
+        const Move move = (*moves)[index];
+        order.scores[index] = MoveOrderScore(position, move, ply, context, hash_move);
+        order.indices[index] = index;
+    }
+}
+
+Move SelectNextMove(MoveList* moves, int ply, SearchContext& context) {
+    if (!context.use_move_ordering) {
+        return (*moves)[context.order[ply].next++];
     }
 
-    std::sort(
-        sorted, sorted + count, [](const SortedMove& lhs, const SortedMove& rhs) {
-            if (lhs.score != rhs.score) {
-                return lhs.score > rhs.score;
-            }
-            return lhs.index < rhs.index;
-        });
-
-    moves->Clear();
-    for (std::size_t index = 0; index < count; ++index) {
-        moves->Add(sorted[index].move);
+    StagedMoveOrder& order = context.order[ply];
+    const std::size_t count = moves->Size();
+    assert(order.next < count);
+    std::size_t best = order.next;
+    for (std::size_t index = best + 1; index < count; ++index) {
+        const int score = order.scores[index];
+        const std::size_t original = order.indices[index];
+        if (score > order.scores[best] ||
+            (score == order.scores[best] && original < order.indices[best])) {
+            best = index;
+        }
     }
+
+    const Move move = (*moves)[best];
+    if (best != order.next) {
+        std::swap((*moves)[order.next], (*moves)[best]);
+        std::swap(order.scores[order.next], order.scores[best]);
+        std::swap(order.indices[order.next], order.indices[best]);
+    }
+    ++order.next;
+    return move;
 }
 
 int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
@@ -273,7 +297,10 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
             }
 
             if (IsTactical(move)) {
-                moves[kept++] = move;
+                if (kept != index) {
+                    moves[kept] = move;
+                }
+                ++kept;
                 continue;
             }
             if (!context.forcing.checks) {
@@ -285,7 +312,10 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
                 position.InCheck(position.SideToMove());
             position.UndoMove();
             if (gives_check) {
-                moves[kept++] = move;
+                if (kept != index) {
+                    moves[kept] = move;
+                }
+                ++kept;
             }
         }
         moves.Resize(kept);
@@ -304,10 +334,10 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
         best = stand_pat;
     }
 
-    OrderMoves(position, &moves, ply, context, Move{});
+    StageMoveOrder(position, &moves, ply, context, Move{});
 
     for (std::size_t index = 0; index < moves.Size(); ++index) {
-        const Move move = moves[index];
+        const Move move = SelectNextMove(&moves, ply, context);
         position.MakeMoveAssumeLegal(move);
         context.moves[ply + 1].Clear();
         const int score = -Quiescence(position, -beta, -alpha, ply + 1,
@@ -392,7 +422,7 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         }
     }
 
-    OrderMoves(position, &moves, ply, context, hash_move);
+    StageMoveOrder(position, &moves, ply, context, hash_move);
 
     const int alpha_original = alpha;
     int best = -kInfinity;
@@ -401,7 +431,7 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
 #endif
 
     for (std::size_t index = 0; index < moves.Size(); ++index) {
-        const Move move = moves[index];
+        const Move move = SelectNextMove(&moves, ply, context);
         const Color mover = position.SideToMove();
         const bool tactical = IsTactical(move);
         position.MakeMoveAssumeLegal(move);
