@@ -577,8 +577,6 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             start + std::chrono::milliseconds(*budget.hardMs);
     }
 
-    root.ReserveHistory(root.HistoryDepth() + static_cast<std::size_t>(kMaxPly));
-
     for (int depth = 1; depth <= requested_depth; ++depth) {
         if (stop.load(std::memory_order_relaxed) || context.HardExpired()) {
             break;
@@ -587,6 +585,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             break;
         }
 
+        // Reusing the same root move list across iterations is safe because
+        // each child node uses its own ply and never reorders the root list.
         context.moves[0].Clear();
         const int score = Negamax(root, depth, -kInfinity, kInfinity, 0,
                                   context);

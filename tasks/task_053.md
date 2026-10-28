@@ -7,9 +7,9 @@
 | **Depends on** | 051 |
 | **Estimate** | 0.5 day |
 | **Priority** | P2 |
-| **Status** | Blocked |
+| **Status** | Done |
 
-**Blocker:** waiting for task 051. Flip to `Ready` when 051 is `Done`.
+**Blocker:** task 051 is `Done`, so this task is now `Done` too.
 
 ## Objective
 

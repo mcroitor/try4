@@ -50,22 +50,32 @@ TEST_CASE("transposition table stores and probes full entries", "[search]") {
     REQUIRE_FALSE(table.Probe(0x123456789ABCDEF0ULL, &entry));
 }
 
-TEST_CASE("transposition table rejects key collisions in one bucket",
+TEST_CASE("two-way TT buckets keep two entries and replace the shallower one",
           "[search]") {
     chess::TranspositionTable table(1);
     const std::uint64_t first = 0x1111222233334444ULL;
     const std::uint64_t same_bucket = first + table.Capacity();
+    const std::uint64_t collision = same_bucket + table.Capacity();
 
-    table.Store(first, 4, 11, chess::TTBound::Lower, try4_test::Move("a2", "a3"));
-
+    table.Store(first, 4, 11, chess::TTBound::Lower,
+                try4_test::Move("a2", "a3"));
     chess::TTEntry entry;
+    REQUIRE(table.Probe(first, &entry));
     REQUIRE_FALSE(table.Probe(same_bucket, &entry));
 
     table.Store(same_bucket, 6, 22, chess::TTBound::Upper,
                 try4_test::Move("b2", "b3"));
+    REQUIRE(table.Probe(first, &entry));
+    REQUIRE(entry.depth == 4);
+    REQUIRE(table.Probe(same_bucket, &entry));
+    REQUIRE(entry.depth == 6);
+
+    table.Store(collision, 2, 33, chess::TTBound::Upper,
+                try4_test::Move("c2", "c3"));
     REQUIRE_FALSE(table.Probe(first, &entry));
     REQUIRE(table.Probe(same_bucket, &entry));
-    REQUIRE(entry.score == 22);
+    REQUIRE(table.Probe(collision, &entry));
+    REQUIRE(entry.score == 33);
 }
 
 TEST_CASE("mate scores are adjusted across plies", "[search]") {
