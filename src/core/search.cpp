@@ -88,10 +88,12 @@ struct SearchContext {
           use_transposition_table(use_tt),
           table(tt) {}
 
+    // Pre-validated fast paths. Search() validates limits.evaluation once
+    // before the context is built, so the hot loop must not revalidate.
     int StaticEvaluation(const Position& position) const {
         return evaluation_mode == EvaluationMode::Material
-                   ? EvaluateMaterial(position, evaluation)
-                   : Evaluate(position, evaluation);
+                   ? EvaluateMaterialFast(position, evaluation)
+                   : EvaluateFast(position, evaluation);
     }
 
     bool ShouldStop() {

@@ -228,27 +228,125 @@ struct EvalScore {
     int eg = 0;
 };
 
-Square FindKing(const Position& position, Color color) {
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Square square(index);
-        const Piece piece = position.PieceAt(square);
-        if (piece.Type() == PieceType::King && piece.Color() == color) {
-            return square;
+}  // namespace
+
+// Single-pass evaluation snapshot. BuildFrom() walks the raw 0x88 board exactly
+// once thanks to the Position friendship granted in position.hpp; the dense
+// copy and the per-color piece lists it fills are then reused by every
+// positional helper below, so an evaluation needs one board sweep instead of
+// the roughly ten scans the pre-054 implementation performed. The struct is at
+// namespace scope (not inside an anonymous namespace) because the Position
+// friend grant names it in the enclosing namespace; it is defined only here,
+// in the evaluation translation unit.
+struct BoardSummary {
+    struct PieceEntry {
+        Piece piece;
+        Square square;
+    };
+
+    // Dense board copy indexed by rank * 8 + file. Positional ray walks use
+    // this array directly; At() keeps the IsOnBoard() discipline for the
+    // rays that leave the board.
+    std::array<Piece, 64> board{};
+
+    // Per-color piece entries in board-scan order. A board has 64 squares, so
+    // no side can exceed 64 entries; the loops that fill and read the lists
+    // therefore never need a capacity guard.
+    std::array<std::array<PieceEntry, 64>, 2> pieces{};
+
+    std::array<std::uint8_t, 2> piece_counts{};
+    std::array<std::array<std::uint8_t, 8>, 2> pawn_files{};
+    std::array<std::uint8_t, 2> bishop_counts{};
+    std::array<Square, 2> king_squares{};  // Invalid square when no king.
+    std::array<EvalScore, 2> base{};       // [0] = White, [1] = Black.
+    int phase = 0;                         // Uncapped; capped by the caller.
+
+    Piece At(int rank, int file) const {
+        if (rank < 0 || rank > 7 || file < 0 || file > 7) {
+            return Piece{};
+        }
+        return board[static_cast<std::size_t>(rank * 8 + file)];
+    }
+
+    // Fills everything above with material, PST and phase totals collected in
+    // the same single pass, using the caller's unvalidated parameter set. The
+    // accumulation order matches the pre-054 board sweep exactly.
+    void BuildFrom(const Position& position, const EvaluationParameters& p) {
+        for (std::uint8_t index = 0; index < 64; ++index) {
+            const Square square(index);
+            const Piece piece = position.board_[
+                static_cast<std::size_t>(Position::To0x88(square))];
+            const int rank = square.Rank();
+            const int file = square.File();
+            board[static_cast<std::size_t>(rank * 8 + file)] = piece;
+            if (piece.IsEmpty()) {
+                continue;
+            }
+
+            const std::size_t color_index =
+                static_cast<std::size_t>(piece.Color());
+            const PieceType type = piece.Type();
+
+            pieces[color_index][piece_counts[color_index]] = {piece, square};
+            ++piece_counts[color_index];
+
+            if (type == PieceType::Pawn) {
+                ++pawn_files[color_index][file];
+            }
+            if (type == PieceType::Bishop) {
+                ++bishop_counts[color_index];
+            }
+            if (type == PieceType::King) {
+                king_squares[color_index] = square;
+            }
+
+            base[color_index].mg +=
+                p.material_mg[static_cast<std::size_t>(type)] +
+                PstValue(MiddlegamePst(type), square, piece.Color()) *
+                    p[EvalWeight::PstMgPercent] / 100;
+            base[color_index].eg +=
+                p.material_eg[static_cast<std::size_t>(type)] +
+                PstValue(EndgamePst(type), square, piece.Color()) *
+                    p[EvalWeight::PstEgPercent] / 100;
+            phase += PhaseWeight(type);
         }
     }
-    return Square(Square::kInvalidIndex);
-}
 
-bool HasPawnAt(const Position& position, int rank, int file, Color color) {
-    if (rank < 0 || rank > 7 || file < 0 || file > 7) {
-        return false;
+    // Material-only fast path for the diagnostic EvaluationMode::Material.
+    // Splits the interleaved sum by color; integer addition is commutative, so
+    // the result matches the original square-by-square accumulation exactly.
+    static int MaterialScore(const Position& position,
+                             const EvaluationParameters& p,
+                             Color side_to_move) {
+        int white = 0;
+        int black = 0;
+        for (std::uint8_t index = 0; index < 64; ++index) {
+            const Piece piece = position.board_[
+                static_cast<std::size_t>(Position::To0x88(Square(index)))];
+            if (piece.IsEmpty()) {
+                continue;
+            }
+            const int value = PieceValue(piece.Type(), p);
+            if (piece.Color() == Color::White) {
+                white += value;
+            } else {
+                black += value;
+            }
+        }
+        const int score = white - black;
+        return std::clamp(side_to_move == Color::White ? score : -score,
+                          -kMaxStaticScore, kMaxStaticScore);
     }
-    const Piece piece =
-        position.PieceAt(Square(static_cast<std::uint8_t>(rank * 8 + file)));
+};
+
+namespace {
+
+bool HasPawnAt(const BoardSummary& summary, int rank, int file, Color color) {
+    const Piece piece = summary.At(rank, file);
     return piece.Type() == PieceType::Pawn && piece.Color() == color;
 }
 
-bool IsPassedPawn(const Position& position, Square square, Color color) {
+bool IsPassedPawn(const BoardSummary& summary, Square square, Color color) {
     const Color enemy = Opposite(color);
     const int direction = color == Color::White ? 1 : -1;
     const int file = square.File();
@@ -258,8 +356,7 @@ bool IsPassedPawn(const Position& position, Square square, Color color) {
     for (int f = first_file; f <= last_file; ++f) {
         for (int rank = square.Rank() + direction; rank >= 0 && rank <= 7;
              rank += direction) {
-            const Piece piece = position.PieceAt(
-                Square(static_cast<std::uint8_t>(rank * 8 + f)));
+            const Piece piece = summary.At(rank, f);
             if (piece.Type() == PieceType::Pawn && piece.Color() == enemy) {
                 return false;
             }
@@ -268,16 +365,12 @@ bool IsPassedPawn(const Position& position, Square square, Color color) {
     return true;
 }
 
-EvalScore PawnStructure(const Position& position, Color color, const EvaluationParameters& p) {
+EvalScore PawnStructure(const BoardSummary& summary, Color color,
+                        const EvaluationParameters& p) {
+    const std::size_t color_index = static_cast<std::size_t>(color);
+    const std::array<std::uint8_t, 8>& files = summary.pawn_files[color_index];
     EvalScore score;
-    std::array<int, 8> files{};
 
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Piece piece = position.PieceAt(Square(index));
-        if (piece.Type() == PieceType::Pawn && piece.Color() == color) {
-            ++files[Square(index).File()];
-        }
-    }
     for (int count : files) {
         if (count > 1) {
             score.mg -= (count - 1) * p[EvalWeight::DoubledPawnMg];
@@ -285,12 +378,15 @@ EvalScore PawnStructure(const Position& position, Color color, const EvaluationP
         }
     }
 
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Square square(index);
-        const Piece piece = position.PieceAt(square);
-        if (piece.Type() != PieceType::Pawn || piece.Color() != color) {
+    const std::array<BoardSummary::PieceEntry, 64>& list =
+        summary.pieces[color_index];
+    const std::size_t count = summary.piece_counts[color_index];
+    for (std::size_t index = 0; index < count; ++index) {
+        const Piece piece = list[index].piece;
+        if (piece.Type() != PieceType::Pawn) {
             continue;
         }
+        const Square square = list[index].square;
         const int file = square.File();
         const bool isolated =
             (file == 0 || files[file - 1] == 0) &&
@@ -299,7 +395,7 @@ EvalScore PawnStructure(const Position& position, Color color, const EvaluationP
             score.mg -= p[EvalWeight::IsolatedPawnMg];
             score.eg -= p[EvalWeight::IsolatedPawnEg];
         }
-        if (IsPassedPawn(position, square, color)) {
+        if (IsPassedPawn(summary, square, color)) {
             const int relative_rank =
                 color == Color::White ? square.Rank() : 7 - square.Rank();
             score.mg += p.passed_mg[relative_rank];
@@ -309,7 +405,7 @@ EvalScore PawnStructure(const Position& position, Color color, const EvaluationP
     return score;
 }
 
-int SlidingMobility(const Position& position, Square square, Color color,
+int SlidingMobility(const BoardSummary& summary, Square square, Color color,
                     PieceType type) {
     static constexpr int kDirections[8][2] = {
         {1, 0},  {-1, 0}, {0, 1},  {0, -1},
@@ -323,8 +419,7 @@ int SlidingMobility(const Position& position, Square square, Color color,
         int rank = square.Rank() + kDirections[direction][0];
         int file = square.File() + kDirections[direction][1];
         while (rank >= 0 && rank <= 7 && file >= 0 && file <= 7) {
-            const Piece target = position.PieceAt(
-                Square(static_cast<std::uint8_t>(rank * 8 + file)));
+            const Piece target = summary.At(rank, file);
             if (target.IsEmpty()) {
                 ++moves;
             } else {
@@ -340,68 +435,63 @@ int SlidingMobility(const Position& position, Square square, Color color,
     return moves;
 }
 
-EvalScore Mobility(const Position& position, Color color, const EvaluationParameters& p) {
+EvalScore Mobility(const BoardSummary& summary, Color color,
+                   const EvaluationParameters& p) {
+    const std::size_t color_index = static_cast<std::size_t>(color);
+    const std::array<BoardSummary::PieceEntry, 64>& list =
+        summary.pieces[color_index];
+    const std::size_t count = summary.piece_counts[color_index];
     int moves = 0;
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Square square(index);
-        const Piece piece = position.PieceAt(square);
-        if (piece.Color() != color) {
-            continue;
-        }
+    for (std::size_t index = 0; index < count; ++index) {
+        const Piece piece = list[index].piece;
         if (piece.Type() == PieceType::Bishop ||
             piece.Type() == PieceType::Rook ||
             piece.Type() == PieceType::Queen) {
-            moves += SlidingMobility(position, square, color, piece.Type());
+            moves += SlidingMobility(summary, list[index].square, color,
+                                     piece.Type());
         }
     }
     return {moves * p[EvalWeight::MobilityMg], moves * p[EvalWeight::MobilityEg]};
 }
 
-EvalScore BishopPair(const Position& position, Color color, const EvaluationParameters& p) {
-    int bishops = 0;
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Piece piece = position.PieceAt(Square(index));
-        if (piece.Type() == PieceType::Bishop && piece.Color() == color) {
-            ++bishops;
-        }
-    }
-    if (bishops >= 2) {
+EvalScore BishopPair(const BoardSummary& summary, Color color,
+                     const EvaluationParameters& p) {
+    if (summary.bishop_counts[static_cast<std::size_t>(color)] >= 2) {
         return {p[EvalWeight::BishopPairMg], p[EvalWeight::BishopPairEg]};
     }
     return {};
 }
 
-EvalScore RookFiles(const Position& position, Color color, const EvaluationParameters& p) {
+EvalScore RookFiles(const BoardSummary& summary, Color color,
+                    const EvaluationParameters& p) {
+    const std::size_t color_index = static_cast<std::size_t>(color);
+    const std::size_t enemy_index =
+        static_cast<std::size_t>(Opposite(color));
     EvalScore score;
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Square square(index);
-        const Piece piece = position.PieceAt(square);
-        if (piece.Type() != PieceType::Rook || piece.Color() != color) {
+    const std::array<BoardSummary::PieceEntry, 64>& list =
+        summary.pieces[color_index];
+    const std::size_t count = summary.piece_counts[color_index];
+    for (std::size_t index = 0; index < count; ++index) {
+        const Piece piece = list[index].piece;
+        if (piece.Type() != PieceType::Rook) {
             continue;
         }
-        bool own_pawn = false;
-        bool enemy_pawn = false;
-        for (int rank = 0; rank < 8; ++rank) {
-            const Piece target = position.PieceAt(
-                Square(static_cast<std::uint8_t>(rank * 8 + square.File())));
-            if (target.Type() != PieceType::Pawn) {
-                continue;
-            }
-            if (target.Color() == color) {
-                own_pawn = true;
-            } else {
-                enemy_pawn = true;
-            }
-        }
+        const int file = list[index].square.File();
+        // The pass already counted pawns per file per color, which is exactly
+        // the presence information the original per-rook rank scan produced.
+        const bool own_pawn = summary.pawn_files[color_index][file] != 0;
+        const bool enemy_pawn = summary.pawn_files[enemy_index][file] != 0;
         if (!own_pawn) {
-            score.mg += enemy_pawn ? p[EvalWeight::RookSemiOpenMg] : p[EvalWeight::RookOpenMg];
-            score.eg += enemy_pawn ? p[EvalWeight::RookSemiOpenEg] : p[EvalWeight::RookOpenEg];
+            score.mg += enemy_pawn ? p[EvalWeight::RookSemiOpenMg]
+                                   : p[EvalWeight::RookOpenMg];
+            score.eg += enemy_pawn ? p[EvalWeight::RookSemiOpenEg]
+                                   : p[EvalWeight::RookOpenEg];
         }
     }
     return score;
 }
 
-bool SliderPathClear(const Position& position, Square from, Square to) {
+bool SliderPathClear(const BoardSummary& summary, Square from, Square to) {
     const int rank_step =
         (to.Rank() > from.Rank()) - (to.Rank() < from.Rank());
     const int file_step =
@@ -409,9 +499,7 @@ bool SliderPathClear(const Position& position, Square from, Square to) {
     int rank = from.Rank() + rank_step;
     int file = from.File() + file_step;
     while (rank != to.Rank() || file != to.File()) {
-        if (!position
-                 .PieceAt(Square(static_cast<std::uint8_t>(rank * 8 + file)))
-                 .IsEmpty()) {
+        if (!summary.At(rank, file).IsEmpty()) {
             return false;
         }
         rank += rank_step;
@@ -420,7 +508,7 @@ bool SliderPathClear(const Position& position, Square from, Square to) {
     return true;
 }
 
-bool AttacksSquare(const Position& position, Square from, PieceType type,
+bool AttacksSquare(const BoardSummary& summary, Square from, PieceType type,
                    Color color, Square target) {
     const int rank_delta = target.Rank() - from.Rank();
     const int file_delta = target.File() - from.File();
@@ -439,36 +527,38 @@ bool AttacksSquare(const Position& position, Square from, PieceType type,
                    (abs_rank != 0 || abs_file != 0);
         case PieceType::Bishop:
             return abs_rank == abs_file && abs_rank != 0 &&
-                   SliderPathClear(position, from, target);
+                   SliderPathClear(summary, from, target);
         case PieceType::Rook:
             return (rank_delta == 0 || file_delta == 0) &&
                    (rank_delta != 0 || file_delta != 0) &&
-                   SliderPathClear(position, from, target);
+                   SliderPathClear(summary, from, target);
         case PieceType::Queen:
             return (abs_rank == abs_file || rank_delta == 0 ||
                     file_delta == 0) &&
                    (rank_delta != 0 || file_delta != 0) &&
-                   SliderPathClear(position, from, target);
+                   SliderPathClear(summary, from, target);
         case PieceType::None:
             return false;
     }
     return false;
 }
 
-int CountKingAttackers(const Position& position, Color defender) {
-    const Square king = FindKing(position, defender);
+int CountKingAttackers(const BoardSummary& summary, Color defender) {
+    const Square king = summary.king_squares[static_cast<std::size_t>(defender)];
     if (!king.IsValid()) {
         return 0;
     }
     const Color enemy = Opposite(defender);
+    const std::size_t enemy_index = static_cast<std::size_t>(enemy);
+    const std::array<BoardSummary::PieceEntry, 64>& list =
+        summary.pieces[enemy_index];
+    const std::size_t count = summary.piece_counts[enemy_index];
     int attackers = 0;
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Square from(index);
-        const Piece piece = position.PieceAt(from);
-        if (piece.IsEmpty() || piece.Color() != enemy ||
-            piece.Type() == PieceType::None) {
-            continue;
-        }
+    // The list is in board-scan order, so the iteration matches the original
+    // 64-square sweep and its early-exit zone test exactly.
+    for (std::size_t index = 0; index < count; ++index) {
+        const Square from = list[index].square;
+        const Piece piece = list[index].piece;
         bool attacks_zone = false;
         for (int rank_delta = -1; rank_delta <= 1 && !attacks_zone;
              ++rank_delta) {
@@ -482,7 +572,7 @@ int CountKingAttackers(const Position& position, Color defender) {
                 const Square target(
                     static_cast<std::uint8_t>(rank * 8 + file));
                 attacks_zone =
-                    AttacksSquare(position, from, piece.Type(), enemy, target);
+                    AttacksSquare(summary, from, piece.Type(), enemy, target);
             }
         }
         if (attacks_zone) {
@@ -492,8 +582,9 @@ int CountKingAttackers(const Position& position, Color defender) {
     return attackers;
 }
 
-EvalScore KingSafety(const Position& position, Color color, const EvaluationParameters& p) {
-    const Square king = FindKing(position, color);
+EvalScore KingSafety(const BoardSummary& summary, Color color,
+                     const EvaluationParameters& p) {
+    const Square king = summary.king_squares[static_cast<std::size_t>(color)];
     if (!king.IsValid()) {
         return {};
     }
@@ -505,10 +596,10 @@ EvalScore KingSafety(const Position& position, Color color, const EvaluationPara
         const int first_file = std::max(0, king.File() - 1);
         const int last_file = std::min(7, king.File() + 1);
         for (int file = first_file; file <= last_file; ++file) {
-            if (HasPawnAt(position, king.Rank() + direction, file, color)) {
+            if (HasPawnAt(summary, king.Rank() + direction, file, color)) {
                 score.mg += p[EvalWeight::ShieldOneMg];
                 score.eg += p[EvalWeight::ShieldOneEg];
-            } else if (HasPawnAt(position, king.Rank() + 2 * direction, file,
+            } else if (HasPawnAt(summary, king.Rank() + 2 * direction, file,
                                  color)) {
                 score.mg += p[EvalWeight::ShieldTwoMg];
                 score.eg += p[EvalWeight::ShieldTwoEg];
@@ -518,7 +609,7 @@ EvalScore KingSafety(const Position& position, Color color, const EvaluationPara
             }
         }
     }
-    const int attackers = CountKingAttackers(position, color);
+    const int attackers = CountKingAttackers(summary, color);
     score.mg -= attackers * p[EvalWeight::KingAttackerMg];
     score.eg -= attackers * p[EvalWeight::KingAttackerEg];
     return score;
@@ -526,6 +617,57 @@ EvalScore KingSafety(const Position& position, Color color, const EvaluationPara
 
 EvalScore FromColorPerspective(EvalScore white, EvalScore black, int sign) {
     return {sign * (white.mg - black.mg), sign * (white.eg - black.eg)};
+}
+
+EvaluationBreakdown EvaluateDetailCore(const Position& position,
+                                       const EvaluationParameters& p) {
+    BoardSummary summary;
+    summary.BuildFrom(position, p);
+
+    const int sign = position.SideToMove() == Color::White ? 1 : -1;
+    const EvalScore base =
+        FromColorPerspective(summary.base[0], summary.base[1], sign);
+    const EvalScore pawn_structure =
+        FromColorPerspective(PawnStructure(summary, Color::White, p),
+                             PawnStructure(summary, Color::Black, p), sign);
+    const EvalScore mobility =
+        FromColorPerspective(Mobility(summary, Color::White, p),
+                             Mobility(summary, Color::Black, p), sign);
+    const EvalScore bishop_pair =
+        FromColorPerspective(BishopPair(summary, Color::White, p),
+                             BishopPair(summary, Color::Black, p), sign);
+    const EvalScore rook_files =
+        FromColorPerspective(RookFiles(summary, Color::White, p),
+                             RookFiles(summary, Color::Black, p), sign);
+    const EvalScore king_safety =
+        FromColorPerspective(KingSafety(summary, Color::White, p),
+                             KingSafety(summary, Color::Black, p), sign);
+
+    EvaluationBreakdown result;
+    result.pawn_structure_mg = pawn_structure.mg;
+    result.pawn_structure_eg = pawn_structure.eg;
+    result.mobility_mg = mobility.mg;
+    result.mobility_eg = mobility.eg;
+    result.bishop_pair_mg = bishop_pair.mg;
+    result.bishop_pair_eg = bishop_pair.eg;
+    result.rook_files_mg = rook_files.mg;
+    result.rook_files_eg = rook_files.eg;
+    result.king_safety_mg = king_safety.mg;
+    result.king_safety_eg = king_safety.eg;
+
+    result.middlegame = base.mg + pawn_structure.mg + mobility.mg +
+                        bishop_pair.mg + rook_files.mg + king_safety.mg;
+    result.endgame = base.eg + pawn_structure.eg + mobility.eg +
+                     bishop_pair.eg + rook_files.eg + king_safety.eg;
+    result.phase = std::min(summary.phase, kMaxPhase);
+    result.tempo = p[EvalWeight::Tempo];
+    result.score =
+        (result.middlegame * result.phase +
+         result.endgame * (kMaxPhase - result.phase)) /
+            kMaxPhase +
+        result.tempo;
+    result.score = std::clamp(result.score, -kMaxStaticScore, kMaxStaticScore);
+    return result;
 }
 
 }  // namespace
@@ -549,102 +691,28 @@ int PieceValue(PieceType type, const EvaluationParameters& p) {
 
 int EvaluateMaterial(const Position& position, const EvaluationParameters& p) {
     if (!ValidateEvaluation(p)) { return 0; }
-    int white = 0;
-    int black = 0;
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Piece piece = position.PieceAt(Square(index));
-        if (piece.IsEmpty()) {
-            continue;
-        }
-        const int value = PieceValue(piece.Type(), p);
-        if (piece.Color() == Color::White) {
-            white += value;
-        } else {
-            black += value;
-        }
-    }
-    const int score = white - black;
-    return std::clamp(position.SideToMove() == Color::White ? score : -score,
-                      -kMaxStaticScore, kMaxStaticScore);
+    return BoardSummary::MaterialScore(position, p, position.SideToMove());
 }
 
 EvaluationBreakdown EvaluateDetailed(const Position& position, const EvaluationParameters& p) {
     if (!ValidateEvaluation(p)) { return {}; }
-    EvalScore white_base;
-    EvalScore black_base;
-    int phase = 0;
-
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const Square square(index);
-        const Piece piece = position.PieceAt(square);
-        if (piece.IsEmpty()) {
-            continue;
-        }
-
-        const PieceType type = piece.Type();
-        const EvalScore value = {
-            p.material_mg[static_cast<std::size_t>(type)] +
-                PstValue(MiddlegamePst(type), square, piece.Color()) * p[EvalWeight::PstMgPercent] / 100,
-            p.material_eg[static_cast<std::size_t>(type)] +
-                PstValue(EndgamePst(type), square, piece.Color()) * p[EvalWeight::PstEgPercent] / 100,
-        };
-        if (piece.Color() == Color::White) {
-            white_base.mg += value.mg;
-            white_base.eg += value.eg;
-        } else {
-            black_base.mg += value.mg;
-            black_base.eg += value.eg;
-        }
-        phase += PhaseWeight(type);
-    }
-
-    const int sign = position.SideToMove() == Color::White ? 1 : -1;
-    const EvalScore base = FromColorPerspective(white_base, black_base, sign);
-    const EvalScore pawn_structure =
-        FromColorPerspective(PawnStructure(position, Color::White, p),
-                             PawnStructure(position, Color::Black, p), sign);
-    const EvalScore mobility =
-        FromColorPerspective(Mobility(position, Color::White, p),
-                             Mobility(position, Color::Black, p), sign);
-    const EvalScore bishop_pair =
-        FromColorPerspective(BishopPair(position, Color::White, p),
-                             BishopPair(position, Color::Black, p), sign);
-    const EvalScore rook_files =
-        FromColorPerspective(RookFiles(position, Color::White, p),
-                             RookFiles(position, Color::Black, p), sign);
-    const EvalScore king_safety =
-        FromColorPerspective(KingSafety(position, Color::White, p),
-                             KingSafety(position, Color::Black, p), sign);
-
-    EvaluationBreakdown result;
-    result.pawn_structure_mg = pawn_structure.mg;
-    result.pawn_structure_eg = pawn_structure.eg;
-    result.mobility_mg = mobility.mg;
-    result.mobility_eg = mobility.eg;
-    result.bishop_pair_mg = bishop_pair.mg;
-    result.bishop_pair_eg = bishop_pair.eg;
-    result.rook_files_mg = rook_files.mg;
-    result.rook_files_eg = rook_files.eg;
-    result.king_safety_mg = king_safety.mg;
-    result.king_safety_eg = king_safety.eg;
-
-    result.middlegame = base.mg + pawn_structure.mg + mobility.mg +
-                        bishop_pair.mg + rook_files.mg + king_safety.mg;
-    result.endgame = base.eg + pawn_structure.eg + mobility.eg +
-                     bishop_pair.eg + rook_files.eg + king_safety.eg;
-    result.phase = std::min(phase, kMaxPhase);
-    result.tempo = p[EvalWeight::Tempo];
-    result.score =
-        (result.middlegame * result.phase +
-         result.endgame * (kMaxPhase - result.phase)) /
-            kMaxPhase +
-        result.tempo;
-    result.score = std::clamp(result.score, -kMaxStaticScore, kMaxStaticScore);
-    return result;
+    return EvaluateDetailCore(position, p);
 }
 
 int Evaluate(const Position& position, const EvaluationParameters& p) {
     return EvaluateDetailed(position, p).score;
+}
+
+int EvaluateMaterialFast(const Position& position, const EvaluationParameters& p) {
+    return BoardSummary::MaterialScore(position, p, position.SideToMove());
+}
+
+EvaluationBreakdown EvaluateDetailedFast(const Position& position, const EvaluationParameters& p) {
+    return EvaluateDetailCore(position, p);
+}
+
+int EvaluateFast(const Position& position, const EvaluationParameters& p) {
+    return EvaluateDetailedFast(position, p).score;
 }
 
 }  // namespace chess

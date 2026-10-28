@@ -130,6 +130,10 @@ public:
 
 private:
     friend class MoveGenerator;
+    // Built by the evaluation translation unit to take a single-pass snapshot
+    // of the board. This keeps the storage private while letting the
+    // evaluation hot path read squares without repeated PieceAt bounds checks.
+    friend struct BoardSummary;
 
     static constexpr bool IsOnBoard(int index) {
         return index >= 0 && index < 128 && (index & 0x88) == 0;

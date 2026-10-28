@@ -69,6 +69,10 @@ add_executable(try4_perft_bench bench/perft_bench.cpp)
 target_link_libraries(try4_perft_bench PRIVATE try4_core)
 try4_enable_warnings(try4_perft_bench)
 
+add_executable(try4_eval_bench bench/eval_bench.cpp)
+target_link_libraries(try4_eval_bench PRIVATE try4_core)
+try4_enable_warnings(try4_eval_bench)
+
 add_executable(try4_selfplay bench/selfplay.cpp)
 target_link_libraries(try4_selfplay PRIVATE try4_core)
 target_compile_definitions(try4_selfplay PRIVATE
@@ -158,6 +162,7 @@ if(TRY4_BUILD_TESTS)
     try4_add_test(try4_perft tests/perft_tests.cpp perft)
     try4_add_test(try4_property tests/property_tests.cpp property)
     try4_add_test(try4_evaluation tests/evaluation_tests.cpp unit)
+    try4_add_test(try4_evaluation_equiv tests/evaluation_equiv_tests.cpp unit)
     try4_add_test(try4_search tests/search_tests.cpp search)
     try4_add_test(try4_tactical tests/tactical_tests.cpp tactical)
 
