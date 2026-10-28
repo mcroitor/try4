@@ -164,6 +164,7 @@ if(TRY4_BUILD_TESTS)
     try4_add_test(try4_evaluation tests/evaluation_tests.cpp unit)
     try4_add_test(try4_evaluation_equiv tests/evaluation_equiv_tests.cpp unit)
     try4_add_test(try4_search tests/search_tests.cpp search)
+    try4_add_test(try4_search_pvs tests/search_pvs_tests.cpp search)
     try4_add_test(try4_tactical tests/tactical_tests.cpp tactical)
 
     find_package(Threads REQUIRED)
