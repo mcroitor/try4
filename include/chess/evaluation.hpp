@@ -81,6 +81,16 @@ constexpr int kTempoBonus = 10;
 EvaluationBreakdown EvaluateDetailed(const Position& position, const EvaluationParameters& parameters = {});
 int Evaluate(const Position& position, const EvaluationParameters& parameters = {});
 
+// Fast paths for the search hot loop. They assume the parameters have already
+// been validated by ValidateEvaluation once per search (Searcher::Search does
+// this before the first node); calling them with invalid parameters is a
+// precondition violation and does not use the zeroed public fallback, so the
+// per-call validation stay entirely out of the inner path. The computation
+// itself is otherwise identical to EvaluateDetailed/Evaluate.
+int EvaluateMaterialFast(const Position& position, const EvaluationParameters& parameters);
+EvaluationBreakdown EvaluateDetailedFast(const Position& position, const EvaluationParameters& parameters);
+int EvaluateFast(const Position& position, const EvaluationParameters& parameters);
+
 }  // namespace chess
 
 #endif  // CHESS_EVALUATION_HPP_
