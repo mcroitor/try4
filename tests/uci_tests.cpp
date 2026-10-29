@@ -38,7 +38,11 @@ TEST_CASE("UCI options", "[uci]") {
 
     REQUIRE(out.find("option name Hash type spin default 16 min 1 max 131072") != std::string::npos);
     REQUIRE(out.find("option name Move Overhead type spin default 20 min 0 max 5000") != std::string::npos);
+#ifdef TRY4_SMP_POC
+    REQUIRE(out.find("option name Threads type spin default 1 min 1 max 4") != std::string::npos);
+#else
     REQUIRE(out.find("option name Threads type spin default 1 min 1 max 1") != std::string::npos);
+#endif
     REQUIRE(out.find("UCI_Chess960") == std::string::npos);
 }
 

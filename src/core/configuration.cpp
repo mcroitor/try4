@@ -92,7 +92,7 @@ bool Assign(UciOptions* options, const std::string& section,
             o.hash_mb = static_cast<std::size_t>(number); return true;
         }
         if (key == "move_overhead_ms") { return Integer(value, &o.move_overhead_ms, 0, 5000); }
-        if (key == "threads") { return Integer(value, &o.threads, 1, 1); }
+        if (key == "threads") { return Integer(value, &o.threads, 1, kMaxUciThreads); }
         if (key == "book_max_ply") { return Integer(value, &o.book_max_ply, 0, 10000); }
     } else if (section == "evaluation") {
         auto& p = o.evaluation;
@@ -158,9 +158,14 @@ std::optional<UciOptions> ParseConfiguration(std::istream& input,
         if (!seen.insert(section + "." + key).second) { return fail("duplicate key " + section + "." + key); }
         if (section == "uci" && key == "threads") {
             int threads = 0;
-            if (!Integer(value, &threads, 1, 1)) {
+            if (!Integer(value, &threads, 1, kMaxUciThreads)) {
+#if defined(TRY4_SMP_POC)
+                return fail("uci.threads=" + value +
+                            " is not in the supported range 1-4 (task 048 PoC)");
+#else
                 return fail("uci.threads=" + value +
                             " is not supported; only one search thread is implemented");
+#endif
             }
         }
         if (!Assign(&result, section, key, value)) { return fail("unknown key or invalid value: " + section + "." + key); }

@@ -10,6 +10,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(TRY4_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
 option(TRY4_BUILD_TESTS "Build the test suite" ON)
 option(TRY4_PORTABLE_WINDOWS "Use a self-contained Windows C++ runtime" ON)
+# Task 048: Lazy SMP proof of concept. OFF keeps every artifact 0.1.0
+# compatible: Threads stays 1 and the INI parser keeps rejecting other values.
+option(TRY4_SMP_POC "Enable the Lazy SMP proof of concept (Threads 1-4)" OFF)
 
 if(MSVC AND TRY4_PORTABLE_WINDOWS)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -39,6 +42,9 @@ target_include_directories(try4_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
+if(TRY4_SMP_POC)
+    target_compile_definitions(try4_core PUBLIC TRY4_SMP_POC)
+endif()
 find_package(Threads REQUIRED)
 target_link_libraries(try4_core PUBLIC Threads::Threads)
 

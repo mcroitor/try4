@@ -298,6 +298,38 @@ class ProcessTests(unittest.TestCase):
         self.assertIn("info string resign score mate", e.until("info string resign "))
         self.assertEqual(e.until("bestmove "), "bestmove 0000")
 
+    def test_threads_option_range_matches_advertised_max(self):
+        # Task 048: the Threads range is 1 without the PoC and 1-4 with it;
+        # the test reads the advertised maximum instead of hard-coding it.
+        e = self.engine()
+        option_line = next(line for line in e.trace
+                           if line.startswith("option name Threads type spin"))
+        max_threads = int(re.search(r"max (\d+)", option_line).group(1))
+        e.send(f"setoption name Threads value {max_threads}")
+        e.send("position startpos\ngo depth 1")
+        self.assertTrue(e.until("bestmove ").startswith("bestmove "))
+        e.send("position startpos\ngo depth 2")
+        self.assertTrue(e.until("bestmove ").startswith("bestmove "))
+
+        e.send(f"setoption name Threads value {max_threads + 1}")
+        # An out-of-range value must retain the prior valid setting; the next
+        # search still behaves normally.
+        e.send("position startpos\ngo depth 1")
+        self.assertTrue(e.until("bestmove ").startswith("bestmove "))
+
+        if max_threads > 1:
+            # Stop during multi-thread search: still one bestmove, promptly.
+            e.send("ucinewgame")
+            e.send("position startpos\ngo movetime 2000")
+            e.until("info depth ")
+            start = time.monotonic()
+            e.send("stop")
+            best = e.until("bestmove ")
+            self.assertNotEqual(best, "bestmove 0000")
+            self.assertLess(time.monotonic() - start, 1.5)
+            self.assertEqual(sum(line.startswith("bestmove ")
+                                 for line in e.trace), 1)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

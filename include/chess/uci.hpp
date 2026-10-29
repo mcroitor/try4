@@ -22,11 +22,19 @@
 
 namespace chess {
 
+// Task 048: maximum worker count. Frozen at 1 without the SMP PoC.
+#ifdef TRY4_SMP_POC
+inline constexpr int kMaxUciThreads = 4;
+#else
+inline constexpr int kMaxUciThreads = 1;
+#endif
+
 // UCI option definitions for the engine.
 struct UciOptions {
     std::size_t hash_mb = 16;
     int move_overhead_ms = 20;
-    // Threads fixed at 1 for v1; field present for future compatibility.
+    // Task 048: 1 by default and always 1 unless TRY4_SMP_POC is on; the
+    // PoC accepts 1-4 through setoption and the [uci] section.
     int threads = 1;
 
     // Task 058: resign threshold in centipawns, from the side to move's

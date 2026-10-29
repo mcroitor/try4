@@ -8,7 +8,20 @@
 | **Depends on** | 034 |
 | **Estimate** | 2 days |
 | **Priority** | P2 |
-| **Status** | Ready |
+| **Status** | Done |
+
+**Split outcome.**
+- **Opening book (Polyglot `.bin` + the text format):** shipped earlier,
+  behind `OwnBook`/`BookFile`/`BookMaxPly` (see `docs/UCI.md`); load failures
+  fall back to search with `info string Book load failed:`, which is the
+  "fails gracefully when data is missing" contract.
+- **Lazy SMP:** superseded by task 048's PoC (`build/smp-on`); the
+  go/no-go and the follow-up live in `docs/SMP_POC.md`.
+- **Syzygy tablebases: not pursued.** No tablebase assets are available on
+  this machine or repository, so a probing implementation could not be
+  tested at all; the smallest unblock action is obtaining a small set of
+  3-4-5-piece `.rtbw`/`.rtbz` files. Probing, licensing and the
+  fifty-move-rule integration remain requirements for that follow-up.
 
 ## Objective
 
