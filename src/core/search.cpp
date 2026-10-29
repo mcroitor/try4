@@ -754,7 +754,35 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
         return info;
     }
 
-    const TimeBudget budget = ComputeTimeBudget(limits, position.SideToMove());
+    const TimeBudget budget =
+        ComputeTimeBudget(limits, position.SideToMove());
+    // Task 057: the per-iteration predictor. `predicted_ms` is the previous
+    // completed iteration's wall time scaled by a measured effective
+    // branching factor (clamped 1.5..4.0, fallback 2.0 when no node history
+    // exists); fixed-node/depth searches have no budget and never predict.
+    std::int64_t previous_iteration_ms = 0;
+    std::uint64_t previous_iteration_nodes = 0;
+    std::uint64_t completed_iteration_nodes = 0;
+    bool previous_iteration_was_stable = true;
+    Move previous_best;
+    bool have_previous_best = false;
+
+    const auto predict_iteration_ms = [&]() -> std::int64_t {
+        if (!budget.HasLimit() || previous_iteration_ms <= 0 ||
+            previous_iteration_nodes == 0) {
+            return 0;
+        }
+        double branching = 2.0;
+        if (completed_iteration_nodes > previous_iteration_nodes) {
+            branching = static_cast<double>(completed_iteration_nodes) /
+                        static_cast<double>(previous_iteration_nodes);
+        }
+        branching = std::clamp(branching, 1.5, 4.0);
+        return std::min<std::int64_t>(
+            static_cast<std::int64_t>(
+                static_cast<double>(previous_iteration_ms) * branching),
+            std::max<std::int64_t>(0, *budget.hardMs * 4));
+    };
     const int requested_depth =
         std::min(kMaxPly - 1, limits.depth.value_or(
             limits.infinite ? kMaxPly - 1 : (budget.HasLimit() ? 64 : kDefaultDepth)));
@@ -788,13 +816,33 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
     // The aspiration anchor is the last completed iteration's score; before
     // depth kAspirationMinDepth every iteration uses the full window.
     int previous_score = info.scoreCp;
+    Clock::time_point iteration_start = Clock::now();
     for (int depth = 1; depth <= requested_depth; ++depth) {
         if (stop.load(std::memory_order_relaxed) || context.HardExpired()) {
             break;
         }
-        if (depth > 1 && context.SoftExpired()) {
-            break;
+
+        const std::int64_t elapsed_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                Clock::now() - start)
+                .count();
+        if (depth > 1) {
+            const std::int64_t predicted = predict_iteration_ms();
+            const bool soft_expired = context.SoftExpired();
+            // Task 057: a soft-limit stop is kept except when the last
+            // completed iteration changed the best move and the prediction
+            // still lands inside the hard ceiling; in that case the search
+            // may extend to hard. The predictor itself never skips an
+            // iteration without prior timing (predicted == 0 there).
+            const bool extend_to_hard_on_instability =
+                !previous_iteration_was_stable && budget.hardMs.has_value() &&
+                elapsed_ms + predicted <= *budget.hardMs;
+            if ((predicted > 0 && elapsed_ms + predicted > *budget.hardMs) ||
+                (soft_expired && !extend_to_hard_on_instability)) {
+                break;
+            }
         }
+        iteration_start = Clock::now();
 
         const bool narrow =
             context.use_aspiration_windows && depth >= kAspirationMinDepth &&
@@ -848,10 +896,27 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             break;
         }
 
+        // Task 057 predictor bookkeeping: the completed iteration's duration
+        // and node share feed the branching-factor prediction; the best-move
+        // stability of this iteration decides whether a later soft-expired
+        // iteration may extend to hard.
+        const Clock::time_point iteration_end = Clock::now();
+        const Move best_before =
+            info.bestMove.has_value() ? *info.bestMove : Move{};
+        previous_iteration_nodes = completed_iteration_nodes;
+        completed_iteration_nodes = context.nodes;
+        previous_iteration_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                iteration_end - iteration_start)
+                .count();
+
         info.depth = depth;
         info.scoreCp = score;
         info.pv.assign(context.pv[0], context.pv[0] + pv_length);
         info.bestMove = info.pv.front();
+        previous_iteration_was_stable =
+            have_previous_best && *info.bestMove == best_before;
+        have_previous_best = true;
 
         if (on_progress) {
             on_progress(info);

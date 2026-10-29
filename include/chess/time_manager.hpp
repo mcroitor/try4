@@ -19,8 +19,11 @@ struct TimeBudget {
 };
 
 // Computes a soft target and hard ceiling for the side to move. `movetime`
-// takes precedence over the clock. A missing clock produces no limit.
-TimeBudget ComputeTimeBudget(const SearchLimits& limits, Color side);
+// takes precedence over the clock. A missing clock produces no limit. The
+// optional `move_overhead_ms` widens the safety margin that keeps the hard
+// ceiling below the remaining clock (task 057).
+TimeBudget ComputeTimeBudget(const SearchLimits& limits, Color side,
+                             std::int64_t move_overhead_ms = 0);
 
 }  // namespace chess
 
