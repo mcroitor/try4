@@ -39,6 +39,9 @@ constexpr int kAspirationMinDepth = 3;
 constexpr int kAspirationWidenFactor = 4;
 constexpr int kMaxAspirationFailures = 2;
 
+// Null-move probing starts at this depth; shallower nodes search exactly.
+constexpr int kNullMoveMinDepth = 3;
+
 bool IsCapture(const Move& move) {
     return move.HasFlag(MoveFlag::Capture) ||
            move.HasFlag(MoveFlag::EnPassant);
@@ -65,6 +68,7 @@ struct SearchContext {
     bool use_transposition_table = true;
     bool use_principal_variation = true;
     bool use_aspiration_windows = true;
+    PruningSettings pruning;
     EvaluationMode evaluation_mode = EvaluationMode::Full;
     EvaluationParameters evaluation;
     ForcingSearchSettings forcing;
@@ -94,7 +98,9 @@ struct SearchContext {
     SearchContext(std::atomic_bool& stop_flag,
                   std::optional<std::uint64_t> limit, bool ordering,
                   bool quiescence, bool use_tt, bool principal_variation,
-                  bool aspiration_windows, TranspositionTable* tt)
+                  bool aspiration_windows,
+                  const PruningSettings& pruning_settings,
+                  TranspositionTable* tt)
         : node_limit(limit),
           stop(stop_flag),
           use_move_ordering(ordering),
@@ -102,6 +108,7 @@ struct SearchContext {
           use_transposition_table(use_tt),
           use_principal_variation(principal_variation),
           use_aspiration_windows(aspiration_windows),
+          pruning(pruning_settings),
           table(tt) {}
 
     // Pre-validated fast paths. Search() validates limits.evaluation once
@@ -207,6 +214,23 @@ int MoveOrderScore(const Position& position, const Move& move, int ply,
     return score;
 }
 
+// True when `color` has no knight, bishop, rook or queen on the board. A pass
+// can never hurt a side that has no non-pawn moves to spare, so the search
+// disables null-move pruning in such endings to keep zugzwang sound.
+bool SideHasOnlyKingAndPawns(const Position& position, Color color) {
+    for (std::uint8_t index = 0; index < 64; ++index) {
+        const Piece piece = position.PieceAt(Square(index));
+        if (piece.IsEmpty() || piece.Color() != color) {
+            continue;
+        }
+        const PieceType type = piece.Type();
+        if (type != PieceType::King && type != PieceType::Pawn) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // The picker is score-once: the ordering key is evaluated one time per move.
 // The remaining candidates are then selected lazily with a stable maximum
 // selection, which preserves the current ordering policy and avoids paying for
@@ -304,6 +328,8 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
     }
 
     int best = -kInfinity;
+    int stand_pat = 0;
+    bool delta_active = false;
     if (!in_check) {
         std::size_t kept = 0;
         const std::size_t count = moves.Size();
@@ -342,7 +368,7 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
             return 0;
         }
 
-        const int stand_pat = context.StaticEvaluation(position);
+        stand_pat = context.StaticEvaluation(position);
         if (stand_pat >= beta) {
             return stand_pat;
         }
@@ -350,12 +376,33 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
             alpha = stand_pat;
         }
         best = stand_pat;
+
+        // Delta pruning: a capture whose best case cannot even reach alpha,
+        // with a safety margin, is never searched. Never applied in check
+        // (no stand pat) and never when alpha is near a mate score, where
+        // pruning could hide a mate; promotions are never pruned because
+        // their gain is not bounded by the victim's value.
+        delta_active = context.pruning.useDeltaPruning &&
+                       std::abs(alpha) < kMateThreshold;
     }
 
     StageMoveOrder(position, &moves, ply, context, Move{});
 
     for (std::size_t index = 0; index < moves.Size(); ++index) {
         const Move move = SelectNextMove(&moves, ply, context);
+        // Delta pruning applies to captures only: a quiet check kept by the
+        // checks filter can mate, and its gain is never bounded by a victim's
+        // value. Promotions are exempt for the same reason.
+        if (delta_active && !move.HasFlag(MoveFlag::Promotion) &&
+            IsCapture(move)) {
+            const PieceType victim = CaptureVictim(position, move);
+            const int best_case =
+                stand_pat + PieceValue(victim, context.evaluation) +
+                context.pruning.deltaPruningMargin;
+            if (best_case <= alpha) {
+                continue;
+            }
+        }
         position.MakeMoveAssumeLegal(move);
         context.moves[ply + 1].Clear();
         const int score = -Quiescence(position, -beta, -alpha, ply + 1,
@@ -386,7 +433,7 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
 }
 
 int Negamax(Position& position, int depth, int alpha, int beta, int ply,
-            SearchContext& context) {
+            int extensions, SearchContext& context) {
     context.pv_length[ply] = 0;
     ++context.nodes;
     if (context.ShouldStop()) {
@@ -421,6 +468,8 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         return context.StaticEvaluation(position);
     }
 
+    const bool in_check = position.InCheck(position.SideToMove());
+
     Move hash_move;
     if (context.use_transposition_table && context.table != nullptr) {
         TTEntry entry;
@@ -440,6 +489,51 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         }
     }
 
+    // Guarded null-move probe: the mover passes and a zero-window search of
+    // the position with the opponent moving twice decides whether beta is
+    // already reachable. The guards keep the technique safe and affordable by
+    // construction: never at the root (ply > 0), never in check, never below
+    // depth kNullMoveMinDepth, never in endings where the mover has only
+    // king and pawns (zugzwang), never against an opponent with no non-pawn
+    // material (a lone king survives a passed tempo, so the probe can only
+    // waste nodes), never on windows that reach the mate band, and never
+    // when beta is so large that a cutoff is unprovable and the probe would
+    // only spend nodes.
+    if (context.pruning.useNullMove && !in_check && ply > 0 &&
+        depth >= kNullMoveMinDepth &&
+        !SideHasOnlyKingAndPawns(position, position.SideToMove()) &&
+        !SideHasOnlyKingAndPawns(position, Opposite(position.SideToMove())) &&
+        alpha < kMateThreshold && beta > -kMateThreshold && beta < kInfinity) {
+        // The probe's child runs at ply + 1 like any real child, so its stale
+        // move list must be cleared exactly like the move loop does; reusing
+        // the previous sibling's list would search moves of another position.
+        position.MakeNullMove();
+        context.moves[ply + 1].Clear();
+        const int null_depth =
+            std::max(0, depth - 1 - context.pruning.nullMoveReduction);
+        const int null_verdict =
+            -Negamax(position, null_depth, -beta, -beta + 1, ply + 1,
+                     extensions, context);
+        position.UndoMove();
+        if (context.aborted) {
+            return 0;
+        }
+        if (null_verdict >= beta) {
+            // A mate score carried by a null verdict would claim an unproven
+            // mate line; return the still-valid beta bound instead.
+            return null_verdict >= kMateThreshold ? beta : null_verdict;
+        }
+    }
+
+    // Check extension: a check evasion is searched one ply deeper. The
+    // extension is bounded by the per-line budget passed down through the
+    // recursion and by the existing kMaxPly guard.
+    if (context.pruning.useCheckExtension && in_check && extensions > 0) {
+        --extensions;
+        ++depth;
+    }
+    const int search_depth = depth;
+
     StageMoveOrder(position, &moves, ply, context, hash_move);
 
     const int alpha_original = alpha;
@@ -454,28 +548,102 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         const bool tactical = IsTactical(move);
         position.MakeMoveAssumeLegal(move);
 
+        // Late-move reduction for quiet, non-first moves past the depth and
+        // move-number thresholds. The root is never reduced: its key moves
+        // are often quiet, late-ordered mates, and a reduced probe cannot
+        // see them. The hash move, captures, promotions, moves while in
+        // check and moves that give check are never reduced; the gives-check
+        // probe runs on the position after the move. The window guard keeps
+        // reductions out of mate-band windows.
+        int reduction = 0;
+        if (context.pruning.useLateMoveReduction && ply > 0 &&
+            static_cast<int>(index) >=
+                context.pruning.lateMoveReductionMinMoveNumber &&
+            search_depth >= context.pruning.lateMoveReductionMinDepth &&
+            search_depth - 1 >= 1 && !tactical && !in_check &&
+            std::abs(alpha) < kMateThreshold &&
+            std::abs(beta) < kMateThreshold &&
+            !(move == hash_move) &&
+            !position.InCheck(position.SideToMove())) {
+            reduction = 1;
+        }
+
         context.moves[ply + 1].Clear();
-        int score;
+        int score = 0;
+        bool counted = false;  // Reduced-probe verdicts never feed bookkeeping.
         if (context.use_principal_variation && index > 0) {
-            // Zero-window probe. A null-window fail-soft alpha-beta can only
-            // return a bound: at most alpha (the move does not improve) or at
-            // least alpha + 1 (a possible improvement), never an exact score.
-            score = -Negamax(position, depth - 1, -alpha - 1, -alpha,
-                             ply + 1, context);
-            // Only an exact re-search may upgrade alpha or write the PV. The
-            // abort guard keeps an interrupted probe from triggering one.
-            if (!context.aborted && score > alpha) {
-                score = -Negamax(position, depth - 1, -beta, -alpha,
-                                 ply + 1, context);
+            if (reduction > 0) {
+                score = -Negamax(position, search_depth - 1 - reduction,
+                                 -alpha - 1, -alpha, ply + 1, extensions,
+                                 context);
+                if (!context.aborted && score > alpha) {
+                    // Fail high under the reduced probe: re-search at full
+                    // depth, still with the zero window.
+                    score = -Negamax(position, search_depth - 1, -alpha - 1,
+                                     -alpha, ply + 1, extensions, context);
+                    if (context.aborted) {
+                        return 0;
+                    }
+                    // A full-depth zero-window verdict is a sound bound, so
+                    // it participates exactly like the un-reduced probe.
+                    counted = true;
+                    if (score > alpha) {
+                        // Still a fail high: the exact full-window re-search
+                        // that may raise alpha or write the PV.
+                        score = -Negamax(position, search_depth - 1, -beta,
+                                         -alpha, ply + 1, extensions, context);
+                    }
+                }
+                // Reduced probe verdict at most alpha: probe-only.
+            } else {
+                score = -Negamax(position, search_depth - 1, -alpha - 1,
+                                 -alpha, ply + 1, extensions, context);
+                if (context.aborted) {
+                    return 0;
+                }
+                counted = true;
+                if (score > alpha) {
+                    // Zero-window fail high: an exact full-window re-search is
+                    // required before the move may raise alpha or write
+                    // the PV.
+                    score = -Negamax(position, search_depth - 1, -beta, -alpha,
+                                     ply + 1, extensions, context);
+                }
             }
         } else {
-            score = -Negamax(position, depth - 1, -beta, -alpha,
-                             ply + 1, context);
+            if (reduction > 0) {
+                score = -Negamax(position, search_depth - 1 - reduction, -beta,
+                                 -alpha, ply + 1, extensions, context);
+                if (context.aborted) {
+                    return 0;
+                }
+                if (score >= beta) {
+                    // A fail high proves the refutation exists; the lower
+                    // bound is sound regardless of the reduction.
+                    counted = true;
+                } else if (score > alpha) {
+                    // Improved alpha without a cutoff: re-search at full
+                    // depth for an exact verdict.
+                    score = -Negamax(position, search_depth - 1, -beta, -alpha,
+                                     ply + 1, extensions, context);
+                    counted = true;
+                }
+            } else {
+                score = -Negamax(position, search_depth - 1, -beta, -alpha,
+                                 ply + 1, extensions, context);
+                counted = true;
+            }
         }
         position.UndoMove();
 
         if (context.aborted) {
             return 0;
+        }
+        if (!counted) {
+            // The reduced probe proved this move does not improve alpha. The
+            // verdict is a bound of the reduced tree, so it never feeds the
+            // fail-soft bookkeeping, the PV or the table store.
+            continue;
         }
         if (score > best) {
             best = score;
@@ -545,7 +713,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
         previous_policy_->usePrincipalVariation !=
             limits.usePrincipalVariation ||
         previous_policy_->useAspirationWindows !=
-            limits.useAspirationWindows) {
+            limits.useAspirationWindows ||
+        previous_policy_->pruning != limits.pruning) {
         table_.Clear();
         previous_policy_ = limits;
     }
@@ -602,7 +771,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
     SearchContext context(stop, node_limit, limits.useMoveOrdering,
                           limits.useQuiescence, limits.useTranspositionTable,
                           limits.usePrincipalVariation,
-                          limits.useAspirationWindows, &table_);
+                          limits.useAspirationWindows, limits.pruning,
+                          &table_);
     context.evaluation_mode = limits.evaluationMode;
     context.evaluation = limits.evaluation;
     context.forcing = limits.forcing;
@@ -642,7 +812,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             // stop flag are shared and monotonic across attempts; a re-search
             // visits nodes anew but never resets the budget.
             context.moves[0].Clear();
-            score = Negamax(root, depth, alpha, beta, 0, context);
+            score = Negamax(root, depth, alpha, beta, 0,
+                            context.pruning.checkExtensionCap, context);
             info.nodes = context.nodes;
             if (context.aborted) {
                 break;

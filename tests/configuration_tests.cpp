@@ -109,3 +109,19 @@ TEST_CASE("Search invalidates cached scores for evaluation and forcing policies"
     REQUIRE(changed.scoreCp != initial.scoreCp);
     REQUIRE(*position == *chess::Position::FromFen(position->ToFen()));
 }
+
+TEST_CASE("Search invalidates cached scores for pruning policies", "[config][search]") {
+    auto position = chess::Position::FromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+    REQUIRE(position);
+    chess::SearchLimits limits;
+    limits.depth = 3;
+    chess::Searcher reused;
+    std::atomic_bool stop{false};
+    const auto initial = reused.Search(*position, limits, stop);
+    limits.pruning.useNullMove = !limits.pruning.useNullMove;
+    chess::Searcher fresh;
+    const auto changed = reused.Search(*position, limits, stop);
+    const auto reference = fresh.Search(*position, limits, stop);
+    REQUIRE(changed.scoreCp == reference.scoreCp);
+    REQUIRE(*position == *chess::Position::FromFen(position->ToFen()));
+}

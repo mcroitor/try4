@@ -295,6 +295,7 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     SearchLimits limits = parsed->limits;
     limits.evaluation = options_.evaluation;
     limits.forcing = options_.forcing;
+    limits.pruning = PruningSettings{};
     limits.useMoveOrdering = true;
     limits.useQuiescence = true;
     limits.useTranspositionTable = true;

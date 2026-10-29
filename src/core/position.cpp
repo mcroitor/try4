@@ -434,6 +434,30 @@ bool Position::MakeMoveAssumeLegal(const Move& move) {
     return true;
 }
 
+bool Position::MakeNullMove() {
+    HistoryEntry entry;
+    entry.move = Move{};  // The null move leaves the board untouched.
+    entry.castling_rights = castling_rights_;
+    entry.en_passant = en_passant_;
+    entry.halfmove_clock = halfmove_clock_;
+    entry.fullmove_number = fullmove_number_;
+    entry.side_to_move = side_to_move_;
+    entry.hash = hash_;
+    history_.push_back(entry);
+
+    // A pass changes exactly two things: the en passant target is no longer
+    // available and the side to move flips. Castling rights are unchanged, so
+    // the incremental update below matches ComputeHash() exactly.
+    if (const std::optional<int> old_en_passant_file = HashEnPassantFile();
+        old_en_passant_file.has_value()) {
+        hash_ ^= zobrist::EnPassantKey(*old_en_passant_file);
+    }
+    en_passant_ = std::nullopt;
+    side_to_move_ = Opposite(side_to_move_);
+    hash_ ^= zobrist::SideKey();
+    return true;
+}
+
 void Position::MakeMoveUnchecked(const Move& move) {
     assert(move.IsValid());
     const int from = To0x88(move.from);
@@ -628,6 +652,17 @@ bool Position::UndoMove() {
 
     const HistoryEntry entry = history_.back();
     history_.pop_back();
+
+    if (entry.move.IsNull()) {
+        // A pass changed only the side to move and the en passant target; the
+        // board, castling rights and clocks are restored by definition.
+        side_to_move_ = entry.side_to_move;
+        en_passant_ = entry.en_passant;
+        halfmove_clock_ = entry.halfmove_clock;
+        fullmove_number_ = entry.fullmove_number;
+        hash_ = entry.hash;
+        return true;
+    }
 
     const int from = To0x88(entry.move.from);
     const int to = To0x88(entry.move.to);

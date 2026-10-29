@@ -103,6 +103,12 @@ TEST_CASE("TT use does not change the fixed-depth minimax result", "[search]") {
         FromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
     chess::SearchLimits with_tt;
     with_tt.depth = 3;
+    // Task 056 requirement 3: this is the fixed-depth exactness oracle from
+    // tasks 051/055, so every pruning technique is disabled here.
+    with_tt.pruning.useNullMove = false;
+    with_tt.pruning.useLateMoveReduction = false;
+    with_tt.pruning.useCheckExtension = false;
+    with_tt.pruning.useDeltaPruning = false;
     std::atomic_bool stop{false};
 
     chess::Searcher tt_searcher;

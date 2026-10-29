@@ -62,6 +62,12 @@ chess::SearchInfo Run(const chess::Position& position, int depth,
     limits.depth = depth;
     limits.usePrincipalVariation = principal_variation;
     limits.useAspirationWindows = aspiration_windows;
+    // Requirement 3 of task 056: this oracle reproduces the task 055 search,
+    // so every pruning technique must be off here.
+    limits.pruning.useNullMove = false;
+    limits.pruning.useLateMoveReduction = false;
+    limits.pruning.useCheckExtension = false;
+    limits.pruning.useDeltaPruning = false;
     std::atomic_bool stop{false};
     return chess::Searcher().Search(position, limits, stop);
 }
