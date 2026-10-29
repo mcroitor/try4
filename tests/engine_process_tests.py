@@ -260,7 +260,8 @@ class ProcessTests(unittest.TestCase):
     def test_forcing_config_finds_quiet_mate_finish(self):
         fen = "r2qkbnr/ppp2ppp/2np4/4N3/2B1P3/2N4P/PPPP1PP1/R1BbK2R w KQkq - 0 7"
         for checks in ("false", "true"):
-            self.config.write_text(f"[search]\nforcing_checks={checks}\nforcing_max_plies=2\n")
+            self.config.write_text(f"[search]\nresign_cp=0\n"
+                                   f"forcing_checks={checks}\nforcing_max_plies=2\n")
             e = self.engine()
             e.send(f"position fen {fen}\ngo depth 1")
             self.assertEqual(e.until("bestmove "), "bestmove c4f7")
@@ -271,6 +272,31 @@ class ProcessTests(unittest.TestCase):
                 e.send(f"position fen {losing}\ngo depth 1")
                 self.assertEqual(e.until("bestmove "), "bestmove e8e7")
                 self.assertTrue(any("score mate -1 " in line for line in e.trace))
+
+    def test_resigns_below_default_threshold(self):
+        # Black stands roughly a queen and a half short; the completed score
+        # is far under the built-in -600 cp threshold.
+        e = self.engine()
+        e.send("position fen 3k4/8/8/8/8/8/8/QQ4K1 b - - 0 1\ngo movetime 300")
+        self.assertIn("threshold -600", e.until("info string resign score cp "))
+        self.assertEqual(e.until("bestmove "), "bestmove 0000")
+        self.assertEqual(sum(line.startswith("bestmove ") for line in e.trace), 1)
+
+    def test_resign_disabled_by_option(self):
+        e = self.engine()
+        e.send("setoption name Resign value 0")
+        e.send("position fen 3k4/8/8/8/8/8/8/QQ4K1 b - - 0 1\ngo movetime 300")
+        best = e.until("bestmove ")
+        self.assertNotEqual(best, "bestmove 0000")
+        self.assertFalse(any("info string resign" in line for line in e.trace))
+
+    def test_negative_mate_resigns_with_mate_notation(self):
+        # Bxf7+ was played; black is in check with the forced eviction to be
+        # mated next ply by Nd5#. Its completed score is a negative mate.
+        e = self.engine()
+        e.send("position fen r2qkbnr/ppp2Bpp/2np4/4N3/4P3/2N4P/PPPP1PP1/R1BbK2R b KQkq - 0 7\ngo movetime 300")
+        self.assertIn("info string resign score mate", e.until("info string resign "))
+        self.assertEqual(e.until("bestmove "), "bestmove 0000")
 
 
 if __name__ == "__main__":

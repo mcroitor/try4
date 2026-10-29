@@ -29,6 +29,11 @@ struct UciOptions {
     // Threads fixed at 1 for v1; field present for future compatibility.
     int threads = 1;
 
+    // Task 058: resign threshold in centipawns, from the side to move's
+    // perspective. 0 or any positive value disables resignation. The effective
+    // range is -100000..0; a negative mate score resigns under the threshold.
+    int resign_cp = -600;
+
     // Opening book options.
     std::string book_path;        // Path to book file (.bin or .txt)
     bool book_enabled = true;     // Whether to use book
@@ -41,6 +46,15 @@ struct UciOptions {
 struct GoCommand {
     SearchLimits limits;
 };
+
+// Task 058: the score-side resignation gate. The caller must satisfy the
+// context exclusions (a completed search, not a cancelled or infinite search,
+// a searched move rather than a book move); this helper holds only the pure
+// score comparison with the disable-at-zero rule and the documented range.
+inline bool ShouldResign(const SearchInfo& info, int resign_cp) {
+    return resign_cp >= -100000 && resign_cp < 0 && info.depth > 0 &&
+           info.scoreCp < resign_cp;
+}
 
 // UCI engine adapter. Handles the UCI protocol handshake and command loop.
 // The engine runs on a background thread; commands are processed on the
@@ -86,7 +100,8 @@ private:
                       std::ostream& out);
     void EmitInfo(std::ostream& out, const SearchInfo& info, int depth,
                   std::uint64_t nodes, std::int64_t elapsed_ms);
-    void EmitBestMove(std::ostream& out, const SearchInfo& info);
+    void EmitBestMove(std::ostream& out, const SearchInfo& info,
+                      bool resign = false);
 
     // State.
     UciOptions options_;

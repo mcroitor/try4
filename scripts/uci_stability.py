@@ -392,7 +392,8 @@ class Worker:
                        f"btime {max(0, int(round(clocks[1])))} "
                        f"winc {options.inc_ms} binc {options.inc_ms} "
                        f"movestogo {options.moves_to_go}")
-            state = {"bestmove": None, "infos": [], "unsupported": []}
+            state = {"bestmove": None, "infos": [], "unsupported": [],
+                     "resigned": False}
             start = time.perf_counter()
             try:
                 engine.send(command)
@@ -401,6 +402,10 @@ class Worker:
                     if line.startswith("info string Unsupported") or \
                             line.startswith("info string Invalid"):
                         state["unsupported"].append(line)
+                    elif line.startswith("info string resign"):
+                        # Task 058: a resignation termination is protocol,
+                        # not a protocol failure; the engine stops playing.
+                        state["resigned"] = True
                     elif line.startswith("bestmove "):
                         state["bestmove"] = line.split()[1] if len(line.split()) > 1 else ""
                     elif line.startswith("info "):
@@ -421,6 +426,14 @@ class Worker:
                                                           "ply": game["plies"],
                                                           "lines": state["unsupported"]})
             bestmove = state["bestmove"]
+            if bestmove == "0000" and state["resigned"]:
+                # Task 058: acceptable resignation termination; the game ends
+                # with the resigned side losing.
+                game["result"] = "1-0" if not white_to_move else "0-1"
+                game["termination"] = "resignation"
+                self.failures.add("resignation", {"game": game_id,
+                                                  "ply": game["plies"]})
+                break
             if not bestmove or bestmove == "0000":
                 errors.append(f"invalid bestmove at ply {game['plies']}: {bestmove!r}")
                 break

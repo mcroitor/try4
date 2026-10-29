@@ -788,7 +788,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
 
     cache = read_cmake_cache(engine_path.parent)
-    options = ["setoption name OwnBook value false"]
+    options = ["setoption name OwnBook value false",
+               # Task 058: benchmarks measure performance and move choice
+               # comparably, so resignation is disabled for all runs.
+               "setoption name Resign value 0"]
     if arguments.hash_mb > 0:
         options.append(f"setoption name Hash value {arguments.hash_mb}")
     meta: Dict[str, object] = {

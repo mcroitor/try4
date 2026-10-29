@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include "chess/configuration.hpp"
+#include "chess/search.hpp"
+#include "chess/uci.hpp"
 
 TEST_CASE("Configuration example and normalized snapshot preserve defaults", "[config]") {
     std::string error;
@@ -108,6 +110,52 @@ TEST_CASE("Search invalidates cached scores for evaluation and forcing policies"
     REQUIRE(changed.scoreCp == reference.scoreCp);
     REQUIRE(changed.scoreCp != initial.scoreCp);
     REQUIRE(*position == *chess::Position::FromFen(position->ToFen()));
+}
+
+TEST_CASE("Search parses resign threshold and records it in the snapshot", "[config][search][resign]") {
+    std::istringstream input("[search]\nresign_cp=-400\n");
+    std::string error;
+    const auto parsed = chess::ParseConfiguration(input, "test.ini", &error);
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->resign_cp == -400);
+    REQUIRE(chess::ConfigurationSnapshot(*parsed).find("resign_cp=-400") != std::string::npos);
+
+    std::istringstream disabled("[search]\nresign_cp=0\n");
+    const auto off = chess::ParseConfiguration(disabled, "test.ini", &error);
+    REQUIRE(off.has_value());
+    REQUIRE(off->resign_cp == 0);
+
+    std::istringstream low("[search]\nresign_cp=-100001\n");
+    const auto rejected = chess::ParseConfiguration(low, "test.ini", &error);
+    REQUIRE_FALSE(rejected.has_value());
+    REQUIRE(error.find("test.ini") != std::string::npos);
+
+    std::istringstream high("[search]\nresign_cp=1\n");
+    REQUIRE_FALSE(chess::ParseConfiguration(high, "test.ini", &error).has_value());
+
+    std::istringstream malformed("[search]\nresign_cp=-600x\n");
+    REQUIRE_FALSE(chess::ParseConfiguration(malformed, "test.ini", &error).has_value());
+
+    std::istringstream duplicate("[search]\nresign_cp=-600\nresign_cp=-500\n");
+    REQUIRE_FALSE(chess::ParseConfiguration(duplicate, "test.ini", &error).has_value());
+
+    // The built-in default is the documented -600.
+    chess::SearchInfo default_info;
+    default_info.depth = 1;
+    default_info.scoreCp = -600;
+    CHECK(chess::ShouldResign(default_info, -600) == false);  // equality holds
+    CHECK(chess::ShouldResign(default_info, -599) == true);   // -601 < -599
+    default_info.scoreCp = -601;
+    CHECK(chess::ShouldResign(default_info, -600) == true);
+    CHECK(chess::ShouldResign(default_info, 0) == false);      // disabled
+    CHECK(chess::ShouldResign(default_info, -100001) == false);  // out of range
+    default_info.depth = 0;
+    CHECK(chess::ShouldResign(default_info, -600) == false);   // no iteration
+    default_info.depth = 1;
+    default_info.scoreCp = chess::kMateScore - 1;
+    CHECK(chess::ShouldResign(default_info, -600) == false);   // positive mate
+    default_info.scoreCp = -(chess::kMateScore - 1);
+    CHECK(chess::ShouldResign(default_info, -600) == true);    // negative mate
 }
 
 TEST_CASE("Search invalidates cached scores for pruning policies", "[config][search]") {

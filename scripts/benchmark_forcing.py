@@ -33,6 +33,9 @@ class Engine:
 
         self.thread = threading.Thread(target=read, daemon=True)
         self.thread.start()
+        # Task 058: all forcing/tactical measurement runs disable resignation
+        # so a losing position cannot end a measurement with `bestmove 0000`.
+        self.send("setoption name Resign value 0")
 
     def send(self, text):
         self.process.stdin.write(text + "\n")

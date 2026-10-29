@@ -64,7 +64,8 @@ UTF-8/NUL, lines over 64 KiB, and invalid ranges fail with file/line/key context
   scores are clamped to ±90000, below the mate band. Invalid direct API settings
   return neutral evaluation; file input reports an error before any search.
 
-`[search]`: `forcing_checks` (false), `forcing_max_plies` (0–120, default 8),
+`[search]`: `resign_cp` (-100000..0, default -600; 0 disables; task 058),
+`forcing_checks` (false), `forcing_max_plies` (0–120, default 8),
 `forcing_hard_plies` (1–120, default 32). Max must not exceed hard.
 See [FORCING_SEARCH.md](FORCING_SEARCH.md) before increasing the checking budget.
 

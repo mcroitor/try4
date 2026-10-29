@@ -5,6 +5,13 @@ only when its tag and release report exist.
 
 ## [Unreleased]
 
+### Added
+
+- Task 058: configurable resignation. `[search] resign_cp` (default -600, 0
+  disables) and the UCI `Resign` spin option; a completed search below the
+  threshold emits `info string resign ...` followed by `bestmove 0000`.
+  Benchmarks and forcing/tactical measurements disable it explicitly.
+
 ### Changed
 
 - UCI now emits one `info depth ...` line after each completed iterative-deepening

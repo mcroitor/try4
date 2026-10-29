@@ -147,3 +147,16 @@ TEST_CASE("UCI info output contains depth and nodes", "[uci]") {
     REQUIRE(out.find("nps") != std::string::npos);
     REQUIRE(out.find("pv") != std::string::npos);
 }
+
+TEST_CASE("UCI exposes the Resign option", "[uci][resign]") {
+    const std::string out = RunUciSession(
+        "uci\n"
+        "quit\n"
+    );
+
+    REQUIRE(out.find("option name Resign type spin default -600 min -100000 max 0") != std::string::npos);
+}
+// The resignation behavior itself is covered by the real-process
+// integration tests in tests/engine_process_tests.py: the in-process harness
+// feeds `quit` immediately after `go`, which by the task contract cancels the
+// search before any iteration completes (and therefore must not resign).
