@@ -1,4 +1,4 @@
-# Task 051 - Restructure the search hot path: one generation per node, fixed PV, no heap
+﻿# Task 051 - Restructure the search hot path: one generation per node, fixed PV, no heap
 
 | Field | Value |
 |---|---|
@@ -7,7 +7,7 @@
 | **Depends on** | 050 |
 | **Estimate** | 1.5 days |
 | **Priority** | P1 |
-| **Status** | Ready |
+| **Status** | Done |
 
 ## Objective
 

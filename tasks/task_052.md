@@ -1,4 +1,4 @@
-# Task 052 - Replace the full sort with a score-once staged move picker
+﻿# Task 052 - Replace the full sort with a score-once staged move picker
 
 | Field | Value |
 |---|---|
@@ -7,7 +7,7 @@
 | **Depends on** | 051 |
 | **Estimate** | 0.5 day |
 | **Priority** | P1 |
-| **Status** | Blocked |
+| **Status** | Done |
 
 **Blocker:** waiting for task 051. Flip to `Ready` when 051 is `Done`.
 

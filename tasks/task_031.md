@@ -1,14 +1,14 @@
-# Task 031 — Add UCI options, detailed info output, and conformance tests
+﻿# Task 031 â€” Add UCI options, detailed info output, and conformance tests
 
 | Field | Value |
 |---|---|
 | **ID** | 031 |
 | **File** | `task_000000000000000000000000000031.md` |
-| **Stage** | 6 — UCI and playable engine |
+| **Stage** | 6 â€” UCI and playable engine |
 | **Depends on** | 030 |
 | **Estimate** | 1.5 days |
 | **Priority** | P1 |
-| **Status** | Ready |
+| **Status** | Done |
 
 ## Objective
 

@@ -1,14 +1,14 @@
-# Task 029 — Implement the UCI adapter skeleton and handshake
+﻿# Task 029 â€” Implement the UCI adapter skeleton and handshake
 
 | Field | Value |
 |---|---|
 | **ID** | 029 |
 | **File** | `task_000000000000000000000000000029.md` |
-| **Stage** | 6 — UCI and playable engine |
+| **Stage** | 6 â€” UCI and playable engine |
 | **Depends on** | 024, 025 |
 | **Estimate** | 1 day |
 | **Priority** | P1 |
-| **Status** | Ready |
+| **Status** | Done |
 
 ## Objective
 
