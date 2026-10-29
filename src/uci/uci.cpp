@@ -593,6 +593,13 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
         }
     }
     info.nodes = aggregate_nodes;
+    // PoC protocol: one final info line with the aggregated node total, so
+    // drivers can measure aggregate NPS without parsing per-worker streams.
+    if (helper_count > 0) {
+        EmitInfo(out, info, info.depth, info.nodes,
+                 std::chrono::duration_cast<Ms>(Clock::now() - start_time)
+                     .count());
+    }
 #endif
 
     if (limits.infinite) {

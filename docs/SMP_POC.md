@@ -76,9 +76,22 @@ python scripts/smp_benchmark.py --engine build/smp-on/try4_uci.exe \
 
 ## Measurements
 
-(Fill from `scripts/smp_benchmark.py` runs on the reference machine; report
-medians with the hardware label. Fixed-node searches never predict; helper
-iterations are independent ID loops with the same budgets.)
+Recorded on the reference machine (Windows/MinGW, Release, same session):
+
+- Fixed `movetime 2000`, 3 repeats (see `scripts/smp_benchmark.py`):
+  depth medians are identical across 1/2/4 threads on all four bench
+  positions (startpos 7, kiwipete 5, perft5-promotion 7, kp-blockade 22).
+  Private-table helpers duplicate the main tree, so the parallel work buys
+  no time-to-depth and only competes for CPU.
+- Depth-targeted `go depth D` with `Threads>1`: the main worker completes
+  its target quickly (e.g. kiwipete depth-6 in 751 ms) but the join waits
+  for the ordering-diversified helpers, which need minutes even at depth 4
+  on kiwipete. Driver guard: `--skip-fixed-depth`; mode recorded as a
+  **variant-A flaw** rather than a bug (helpers do terminate; they are just
+  slower per depth by orders of magnitude on sharp positions).
+- Stop/restart safety, 150 randomized cycles at Threads=4
+  (`scripts/smp_stress.py`): 0 failures, 0 duplicate bestmove, 0 illegal
+  moves, 0 crashes, 66 in-flight stops joined (median ~0 ms, max 766 ms).
 
 ## Limitations
 
@@ -95,4 +108,10 @@ iterations are independent ID loops with the same budgets.)
 
 ## Go/no-go
 
-Recorded after the validation runs; see the task 048 completion report.
+**NO-GO on the current evidence.** Variant A is safe (150-cycle stress, test
+suite) but worthless for time-to-depth (identical depth medians at 1/2/4
+threads); variant B (shared table) is unimplemented and unmeasured. To re-open
+the decision: implement the variant-B spike behind the same option, validate
+under TSan on Linux CI, then re-run the same drivers. The PoC build
+(`TRY4_SMP_POC=ON`) stays available for that follow-up; the default build and
+every release artifact remain single-threaded and unchanged.

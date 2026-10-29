@@ -275,12 +275,17 @@ class ProcessTests(unittest.TestCase):
 
     def test_resigns_below_default_threshold(self):
         # Black stands roughly a queen and a half short; the completed score
-        # is far under the built-in -600 cp threshold.
+        # is far under the built-in -600 cp threshold. The score may be
+        # reported in cp (shallow searches) or mate notation (when the search
+        # proves the forced mate) - both are valid resignation diagnostics.
         e = self.engine()
         e.send("position fen 3k4/8/8/8/8/8/8/QQ4K1 b - - 0 1\ngo movetime 300")
-        self.assertIn("threshold -600", e.until("info string resign score cp "))
+        before = len(e.trace)
+        resign_line = e.until("info string resign score ")
+        self.assertIn("threshold -600", resign_line)
         self.assertEqual(e.until("bestmove "), "bestmove 0000")
-        self.assertEqual(sum(line.startswith("bestmove ") for line in e.trace), 1)
+        self.assertEqual(sum(line.startswith("bestmove ")
+                             for line in e.trace[before:]), 1)
 
     def test_resign_disabled_by_option(self):
         e = self.engine()
@@ -309,7 +314,11 @@ class ProcessTests(unittest.TestCase):
         e.send("position startpos\ngo depth 1")
         self.assertTrue(e.until("bestmove ").startswith("bestmove "))
         e.send("position startpos\ngo depth 2")
-        self.assertTrue(e.until("bestmove ").startswith("bestmove "))
+        before = len(e.trace)
+        best = e.until("bestmove ")
+        self.assertTrue(best.startswith("bestmove "))
+        self.assertEqual(sum(line.startswith("bestmove ")
+                             for line in e.trace[before:]), 1)
 
         e.send(f"setoption name Threads value {max_threads + 1}")
         # An out-of-range value must retain the prior valid setting; the next
@@ -322,13 +331,14 @@ class ProcessTests(unittest.TestCase):
             e.send("ucinewgame")
             e.send("position startpos\ngo movetime 2000")
             e.until("info depth ")
+            before = len(e.trace)
             start = time.monotonic()
             e.send("stop")
             best = e.until("bestmove ")
             self.assertNotEqual(best, "bestmove 0000")
             self.assertLess(time.monotonic() - start, 1.5)
             self.assertEqual(sum(line.startswith("bestmove ")
-                                 for line in e.trace), 1)
+                                 for line in e.trace[before:]), 1)
 
 
 if __name__ == "__main__":

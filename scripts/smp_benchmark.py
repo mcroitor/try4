@@ -63,7 +63,10 @@ class Engine:
                     del self.queue[:index + 1]
                     return taken
             time.sleep(0.002)
-        raise AssertionError(f"timeout waiting for {prefix!r}")
+        raise AssertionError(
+            f"timeout waiting for {prefix!r}; engine alive="
+            f"{self.process.poll() is None}; queue tail="
+            + " | ".join(self.queue[-8:]))
 
     def close(self):
         self.send("quit")
@@ -106,6 +109,10 @@ def main(argv=None):
     parser.add_argument("--depth", type=int, default=6)
     parser.add_argument("--movetime-ms", type=int, default=2000)
     parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--skip-fixed-depth", action="store_true",
+                        help="record only fixed-time runs; depth-targeted "
+                             "joins with diverse helpers are unbounded (see "
+                             "docs/SMP_POC.md)")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
 
@@ -117,50 +124,56 @@ def main(argv=None):
 
     for threads in thread_counts:
         # Fixed depth: aggregate NPS = the final line's nodes/time, or the
-        # sum of helpers where the engine reports aggregate counts.
-        for position_id, position_command in POSITIONS:
-            node_counts = []
-            nps_values = []
-            best_moves = []
-            for repeat in range(args.repeats):
-                engine = Engine(args.engine)
-                engine.send("uci")
-                engine.until("uciok")
-                engine.send("ucinewgame")
-                if threads > 1:
-                    engine.send(f"setoption name Threads value {threads}")
-                engine.send(position_command)
-                engine.send(f"go depth {args.depth}")
-                lines = engine.until("bestmove ", timeout=args.depth * 40.0)
-                engine.close()
-                infos = [parse_info(line) for line in lines
-                         if line.startswith("info ") and " depth " in line
-                         and not line.startswith("info string")]
-                if not infos:
-                    node_counts.append(0)
-                    best_moves.append("")
-                    nps_values.append(0)
-                    continue
-                # The engine's final iteration may include helper nodes.
-                final = infos[-1]
-                node_counts.append(final.get("nodes", 0))
-                nps_values.append(final.get("nps", 0))
-                best = [line.split()[1] for line in lines
-                        if line.startswith("bestmove ")]
-                best_moves.append(best[0] if best else "")
-            report["fixed_depth"].append({
-                "threads": threads, "position": position_id,
-                "nodes_median": statistics.median(node_counts),
-                "nps_median": statistics.median(nps_values),
-                "bestmove_majority": statistics.mode(best_moves)
-                if best_moves else "",
-            })
+        # sum of helpers where the engine reports aggregate counts. With
+        # diverse helpers the join for depth-targeted `go` is unbounded, so
+        # this section is skipped under --skip-fixed-depth.
+        if not args.skip_fixed_depth:
+            for position_id, position_command in POSITIONS:
+                node_counts = []
+                nps_values = []
+                best_moves = []
+                for repeat in range(args.repeats):
+                    engine = Engine(args.engine)
+                    engine.send("uci")
+                    engine.until("uciok")
+                    engine.send("ucinewgame")
+                    if threads > 1:
+                        engine.send(
+                            f"setoption name Threads value {threads}")
+                    engine.send(position_command)
+                    engine.send(f"go depth {args.depth}")
+                    lines = engine.until(
+                        "bestmove ", timeout=args.depth * 40.0)
+                    engine.close()
+                    infos = [parse_info(line) for line in lines
+                             if line.startswith("info ")
+                             and " depth " in line
+                             and not line.startswith("info string")]
+                    if not infos:
+                        node_counts.append(0)
+                        best_moves.append("")
+                        nps_values.append(0)
+                        continue
+                    # The engine's final iteration may include helper nodes.
+                    final = infos[-1]
+                    node_counts.append(final.get("nodes", 0))
+                    nps_values.append(final.get("nps", 0))
+                    best = [line.split()[1] for line in lines
+                            if line.startswith("bestmove ")]
+                    best_moves.append(best[0] if best else "")
+                report["fixed_depth"].append({
+                    "threads": threads, "position": position_id,
+                    "nodes_median": statistics.median(node_counts),
+                    "nps_median": statistics.median(nps_values),
+                    "bestmove_majority": statistics.mode(best_moves)
+                    if best_moves else "",
+                })
 
         # Fixed time: time-to-depth per position.
         for position_id, position_command in POSITIONS:
             depths = []
             agreement = []
-            repeats = []
+            wall_ms = []
             for repeat in range(args.repeats):
                 engine = Engine(args.engine)
                 engine.send("uci")
@@ -169,9 +182,11 @@ def main(argv=None):
                 if threads > 1:
                     engine.send(f"setoption name Threads value {threads}")
                 engine.send(position_command)
+                start = time.monotonic()
                 engine.send(f"go movetime {args.movetime_ms}")
                 lines = engine.until("bestmove ",
                                      timeout=args.movetime_ms / 500.0)
+                wall_ms.append((time.monotonic() - start) * 1000.0)
                 engine.close()
                 infos = [parse_info(line) for line in lines
                          if line.startswith("info depth ")
@@ -185,8 +200,7 @@ def main(argv=None):
                 "depth_median": statistics.median(depths),
                 "bestmove": statistics.mode(agreement)
                 if agreement else "",
-                "move_wall_ms_median": statistics.median(repeats)
-                if repeats else 0.0,
+                "move_wall_ms_median": round(statistics.median(wall_ms), 1),
             })
 
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")

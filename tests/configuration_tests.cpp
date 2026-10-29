@@ -34,13 +34,21 @@ TEST_CASE("Configuration parses BOM CRLF paths and parameter arrays", "[config]"
 }
 
 TEST_CASE("Malformed config is rejected with location and useful reason", "[config]") {
-    for (const std::string text : {
-        "bad", "[bad]\na=1", "[uci]\nthreads=2", "[uci]\nhash_mb=0",
+    const std::string invalid_samples[] = {
+        "bad", "[bad]\na=1",
+#ifdef TRY4_SMP_POC
+        // Task 048 PoC: threads=2 is valid here; the 1-4 range tests live in
+        // the thread-count case below.
+#else
+        "[uci]\nthreads=2",
+#endif
+        "[uci]\nhash_mb=0",
         "[uci]\nhash_mb=99999999999999999999", "[uci]\nown_book=TRUE",
         "[uci]\nhash_mb=32garbage", "[uci]\nhash_mb=32\nhash_mb=16",
         "[evaluation]\nmaterial_mg=1,2", "[evaluation]\nmaterial_mg=0,100,320,330,500,900,1",
         "[evaluation]\npassed_mg=0,1,,2,3,4,5,0", "[evaluation]\ntempo=-1",
-        "[search]\nforcing_max_plies=33\nforcing_hard_plies=32", "[uci]\nbook_file=\xff"}) {
+        "[search]\nforcing_max_plies=33\nforcing_hard_plies=32", "[uci]\nbook_file=\xff"};
+    for (const std::string& text : invalid_samples) {
         std::istringstream stream(text);
         std::string error;
         const auto options = chess::ParseConfiguration(stream, "bad.ini", &error);
@@ -52,6 +60,27 @@ TEST_CASE("Malformed config is rejected with location and useful reason", "[conf
 }
 
 TEST_CASE("Unsupported thread counts are explained", "[config]") {
+#ifdef TRY4_SMP_POC
+    // Task 048 PoC: 1-4 accepted (2 exercised below), everything else is
+    // rejected with the range in the message.
+    {
+        std::istringstream stream("[uci]\nthreads=2\n");
+        std::string error;
+        const auto options = chess::ParseConfiguration(stream, "try4.ini", &error);
+        INFO(error);
+        REQUIRE(options.has_value());
+        REQUIRE(options->threads == 2);
+    }
+    for (const std::string value : {"0", "5", "8"}) {
+        std::istringstream stream("[uci]\nthreads=" + value);
+        std::string error;
+        const auto options = chess::ParseConfiguration(stream, "try4.ini", &error);
+        INFO(error);
+        REQUIRE_FALSE(options);
+        REQUIRE(error.find("try4.ini:2: uci.threads=" + value) == 0);
+        REQUIRE(error.find("range 1-4") != std::string::npos);
+    }
+#else
     for (const std::string value : {"0", "2", "8"}) {
         std::istringstream stream("[uci]\nthreads=" + value);
         std::string error;
@@ -61,6 +90,7 @@ TEST_CASE("Unsupported thread counts are explained", "[config]") {
         REQUIRE(error.find("try4.ini:2: uci.threads=" + value) == 0);
         REQUIRE(error.find("only one search thread is implemented") != std::string::npos);
     }
+#endif
 }
 
 TEST_CASE("Configured evaluation changes targeted terms and isolates engines", "[config][evaluation]") {
