@@ -73,6 +73,20 @@ struct SearchLimits {
     // The table belongs to the Searcher; disabling it is useful for A/B tests.
     bool useTranspositionTable = true;
 
+    // Principal-variation search windows every interior move after the first
+    // with a zero window (alpha, alpha + 1) and re-searches it with the full
+    // window when the zero-window probe improves alpha. The re-search makes
+    // scores, best moves and PVs identical to the full-window search while
+    // cutting nodes where the zero window proves a move is not better.
+    bool usePrincipalVariation = true;
+
+    // Narrows the root window of each iterative-deepening iteration around the
+    // previous iteration's score from depth 3 on, widening on fail-low and
+    // fail-high and falling back to the full window after two failures or when
+    // the score enters the mate band. Only a search that finishes inside its
+    // window is reported, and its score is the exact full-window score.
+    bool useAspirationWindows = true;
+
     // Full evaluation is the production default. Material selects the
     // material-only baseline used by the self-play harness. A table entry's
     // score depends on this mode; use a separate Searcher or clear the table

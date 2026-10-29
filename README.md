@@ -1,11 +1,13 @@
 # try4
 
-`try4` is a C++17 standard-chess engine with a UCI interface, reusable core,
-debugging CLI, and optional opening books. **Version 0.1.0 is tagged locally as
-`v0.1.0` after the final local regression matrix.** The repository has no remote,
-so the tag and release archives are not published; see
-[`docs/RELEASE_VALIDATION.md`](docs/RELEASE_VALIDATION.md) for evidence and
-limitations.
+`try4` is a C++17 standard-chess engine with a UCI interface, reusable core, debugging CLI, and optional opening books. **Version 0.1.0 is tagged locally as `v0.1.0` after the final local regression matrix.** The repository has no remote, so the tag and release archives are not published; see [`docs/RELEASE_VALIDATION.md`](docs/RELEASE_VALIDATION.md) for evidence and limitations.
+
+This is a 4th iteration of the my chess engine development efforts. At the moment the code contains 10-15 % of my hand-written code, started in 2013. Now, when the AI is available, I tried to finish the project with the help of LLMs. The models used in different stages of development:
+
+- GPT 6.1 Luna;
+- DeepSeek 4.1 Flash;
+- GLM 5.3 Flash;
+- Nemotron 3 Ultra.
 
 ## Current status
 

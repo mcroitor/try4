@@ -298,6 +298,8 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     limits.useMoveOrdering = true;
     limits.useQuiescence = true;
     limits.useTranspositionTable = true;
+    limits.usePrincipalVariation = true;
+    limits.useAspirationWindows = true;
 
     // Apply move overhead to time limits.
     if (limits.moveTimeMs.has_value()) {

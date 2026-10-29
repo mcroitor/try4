@@ -28,6 +28,17 @@ constexpr int kKillerOneBonus = 800000;
 constexpr int kKillerTwoBonus = 790000;
 constexpr int kHashMoveBonus = 2000000;
 
+// Aspiration windows start at depth kAspirationMinDepth around the previous
+// iteration's score, widen the failed side by kAspirationWidenFactor on each
+// failed attempt, and fall back to the full window after
+// kMaxAspirationFailures failures or when a score reaches the mate band. A
+// completed narrow search reports the same exact score as a full-window
+// search; failed-window results are never reported.
+constexpr int kAspirationDelta = 25;
+constexpr int kAspirationMinDepth = 3;
+constexpr int kAspirationWidenFactor = 4;
+constexpr int kMaxAspirationFailures = 2;
+
 bool IsCapture(const Move& move) {
     return move.HasFlag(MoveFlag::Capture) ||
            move.HasFlag(MoveFlag::EnPassant);
@@ -52,6 +63,8 @@ struct SearchContext {
     bool use_move_ordering = true;
     bool use_quiescence = true;
     bool use_transposition_table = true;
+    bool use_principal_variation = true;
+    bool use_aspiration_windows = true;
     EvaluationMode evaluation_mode = EvaluationMode::Full;
     EvaluationParameters evaluation;
     ForcingSearchSettings forcing;
@@ -80,12 +93,15 @@ struct SearchContext {
 
     SearchContext(std::atomic_bool& stop_flag,
                   std::optional<std::uint64_t> limit, bool ordering,
-                  bool quiescence, bool use_tt, TranspositionTable* tt)
+                  bool quiescence, bool use_tt, bool principal_variation,
+                  bool aspiration_windows, TranspositionTable* tt)
         : node_limit(limit),
           stop(stop_flag),
           use_move_ordering(ordering),
           use_quiescence(quiescence),
           use_transposition_table(use_tt),
+          use_principal_variation(principal_variation),
+          use_aspiration_windows(aspiration_windows),
           table(tt) {}
 
     // Pre-validated fast paths. Search() validates limits.evaluation once
@@ -439,8 +455,23 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         position.MakeMoveAssumeLegal(move);
 
         context.moves[ply + 1].Clear();
-        const int score = -Negamax(position, depth - 1, -beta, -alpha,
-                                   ply + 1, context);
+        int score;
+        if (context.use_principal_variation && index > 0) {
+            // Zero-window probe. A null-window fail-soft alpha-beta can only
+            // return a bound: at most alpha (the move does not improve) or at
+            // least alpha + 1 (a possible improvement), never an exact score.
+            score = -Negamax(position, depth - 1, -alpha - 1, -alpha,
+                             ply + 1, context);
+            // Only an exact re-search may upgrade alpha or write the PV. The
+            // abort guard keeps an interrupted probe from triggering one.
+            if (!context.aborted && score > alpha) {
+                score = -Negamax(position, depth - 1, -beta, -alpha,
+                                 ply + 1, context);
+            }
+        } else {
+            score = -Negamax(position, depth - 1, -beta, -alpha,
+                             ply + 1, context);
+        }
         position.UndoMove();
 
         if (context.aborted) {
@@ -510,7 +541,11 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
     if (!previous_policy_ || previous_policy_->evaluation != limits.evaluation ||
         previous_policy_->forcing != limits.forcing ||
         previous_policy_->evaluationMode != limits.evaluationMode ||
-        previous_policy_->useQuiescence != limits.useQuiescence) {
+        previous_policy_->useQuiescence != limits.useQuiescence ||
+        previous_policy_->usePrincipalVariation !=
+            limits.usePrincipalVariation ||
+        previous_policy_->useAspirationWindows !=
+            limits.useAspirationWindows) {
         table_.Clear();
         previous_policy_ = limits;
     }
@@ -566,7 +601,8 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
 
     SearchContext context(stop, node_limit, limits.useMoveOrdering,
                           limits.useQuiescence, limits.useTranspositionTable,
-                          &table_);
+                          limits.usePrincipalVariation,
+                          limits.useAspirationWindows, &table_);
     context.evaluation_mode = limits.evaluationMode;
     context.evaluation = limits.evaluation;
     context.forcing = limits.forcing;
@@ -579,6 +615,9 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             start + std::chrono::milliseconds(*budget.hardMs);
     }
 
+    // The aspiration anchor is the last completed iteration's score; before
+    // depth kAspirationMinDepth every iteration uses the full window.
+    int previous_score = info.scoreCp;
     for (int depth = 1; depth <= requested_depth; ++depth) {
         if (stop.load(std::memory_order_relaxed) || context.HardExpired()) {
             break;
@@ -587,15 +626,52 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             break;
         }
 
-        // Reusing the same root move list across iterations is safe because
-        // each child node uses its own ply and never reorders the root list.
-        context.moves[0].Clear();
-        const int score = Negamax(root, depth, -kInfinity, kInfinity, 0,
-                                  context);
-        info.nodes = context.nodes;
-        if (context.aborted) {
+        const bool narrow =
+            context.use_aspiration_windows && depth >= kAspirationMinDepth &&
+            std::abs(previous_score) < kMateThreshold;
+        int delta = kAspirationDelta;
+        int alpha = narrow ? previous_score - delta : -kInfinity;
+        int beta = narrow ? previous_score + delta : kInfinity;
+        int failures = 0;
+        bool complete = false;
+        int score = 0;
+        while (true) {
+            // Reusing the same root move list across iterations and window
+            // attempts is safe because each child node uses its own ply and
+            // never reorders the root list. Nodes, the node limit and the
+            // stop flag are shared and monotonic across attempts; a re-search
+            // visits nodes anew but never resets the budget.
+            context.moves[0].Clear();
+            score = Negamax(root, depth, alpha, beta, 0, context);
+            info.nodes = context.nodes;
+            if (context.aborted) {
+                break;
+            }
+            if (score > alpha && score < beta) {
+                complete = true;
+                break;
+            }
+            // A failed window is never reported. Widen the failed side around
+            // the returned bound value, fall back to the full window after the
+            // failure budget, and never narrow around mate scores.
+            ++failures;
+            if (failures >= kMaxAspirationFailures ||
+                std::abs(score) >= kMateThreshold) {
+                alpha = -kInfinity;
+                beta = kInfinity;
+            } else if (score <= alpha) {
+                alpha = score - delta;
+                delta *= kAspirationWidenFactor;
+            } else {
+                beta = score + delta;
+                delta *= kAspirationWidenFactor;
+            }
+        }
+        if (!complete) {
             break;
         }
+        previous_score = score;
+
         const std::size_t pv_length = context.pv_length[0];
         if (pv_length == 0) {
             break;
