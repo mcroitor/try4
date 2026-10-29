@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "chess/evaluation.hpp"
+#include "chess/see.hpp"
 #include "chess/time_manager.hpp"
 #include "chess/transposition_table.hpp"
 
@@ -330,6 +331,7 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
     int best = -kInfinity;
     int stand_pat = 0;
     bool delta_active = false;
+    bool see_active = false;
     if (!in_check) {
         std::size_t kept = 0;
         const std::size_t count = moves.Size();
@@ -384,6 +386,10 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
         // their gain is not bounded by the victim's value.
         delta_active = context.pruning.useDeltaPruning &&
                        std::abs(alpha) < kMateThreshold;
+        // Task 034: identical placement for SEE capture pruning; the
+        // exchange search needs quiescence's stand pat as its floor.
+        see_active = context.pruning.useStaticExchangePruning &&
+                     std::abs(alpha) < kMateThreshold;
     }
 
     StageMoveOrder(position, &moves, ply, context, Move{});
@@ -393,13 +399,18 @@ int Quiescence(Position& position, int alpha, int beta, int ply, int qply,
         // Delta pruning applies to captures only: a quiet check kept by the
         // checks filter can mate, and its gain is never bounded by a victim's
         // value. Promotions are exempt for the same reason.
-        if (delta_active && !move.HasFlag(MoveFlag::Promotion) &&
-            IsCapture(move)) {
-            const PieceType victim = CaptureVictim(position, move);
-            const int best_case =
-                stand_pat + PieceValue(victim, context.evaluation) +
-                context.pruning.deltaPruningMargin;
-            if (best_case <= alpha) {
+        if ((delta_active || see_active) &&
+            !move.HasFlag(MoveFlag::Promotion) && IsCapture(move)) {
+            if (delta_active) {
+                const PieceType victim = CaptureVictim(position, move);
+                const int best_case =
+                    stand_pat + PieceValue(victim, context.evaluation) +
+                    context.pruning.deltaPruningMargin;
+                if (best_case <= alpha) {
+                    continue;
+                }
+            }
+            if (see_active && See(position, move, context.evaluation) < 0) {
                 continue;
             }
         }

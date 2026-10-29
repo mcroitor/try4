@@ -27,6 +27,7 @@ add_library(try4_core STATIC
     src/core/zobrist.cpp
     src/core/evaluation.cpp
     src/core/search.cpp
+    src/core/see.cpp
     src/core/transposition_table.cpp
     src/core/time_manager.cpp
     src/core/opening_book.cpp
@@ -165,6 +166,7 @@ if(TRY4_BUILD_TESTS)
     try4_add_test(try4_evaluation_equiv tests/evaluation_equiv_tests.cpp unit)
     try4_add_test(try4_search tests/search_tests.cpp search)
     try4_add_test(try4_search_pvs tests/search_pvs_tests.cpp search)
+    try4_add_test(try4_see tests/see_tests.cpp unit)
     try4_add_test(try4_search_pruning tests/search_pruning_tests.cpp search)
     try4_add_test(try4_tactical tests/tactical_tests.cpp tactical)
 

@@ -74,6 +74,16 @@ struct PruningSettings {
     bool useDeltaPruning = true;
     int deltaPruningMargin = 200;
 
+    // Static-exchange pruning of quiescence captures (task 034): skip a
+    // capture the SEE proves loses material. Never applied in check, to
+    // promotions, or when alpha is near the mate band. Off by default with
+    // recorded evidence: on this 0x88 engine a SEE call costs one board copy
+    // plus an attacker scan per quiescence capture, roughly doubling the
+    // per-node rate, so the node savings turn into a one-ply loss at fixed
+    // time on four of eight bench positions (startpos, perft5-promotion,
+    // queen-endgame, in-check). Revisit with bitboards (task 033).
+    bool useStaticExchangePruning = false;
+
     bool operator==(const PruningSettings& other) const {
         return useNullMove == other.useNullMove &&
                nullMoveReduction == other.nullMoveReduction &&
@@ -84,7 +94,8 @@ struct PruningSettings {
                useCheckExtension == other.useCheckExtension &&
                checkExtensionCap == other.checkExtensionCap &&
                useDeltaPruning == other.useDeltaPruning &&
-               deltaPruningMargin == other.deltaPruningMargin;
+               deltaPruningMargin == other.deltaPruningMargin &&
+               useStaticExchangePruning == other.useStaticExchangePruning;
     }
     bool operator!=(const PruningSettings& other) const {
         return !(*this == other);
