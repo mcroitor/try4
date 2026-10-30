@@ -20,11 +20,11 @@
 #include "chess/opening_book.hpp"
 #include "chess/position.hpp"
 #include "chess/search.hpp"
+#include "chess/forensics.hpp"
 #include "chess/time_manager.hpp"
 #include "chess/version.hpp"
 
 #include <cstdio>
-#include <cstdlib>
 
 namespace chess {
 namespace {
@@ -33,7 +33,7 @@ namespace {
 // stderr. Without the variable nothing is written; process tests assert a
 // clean stderr, so this must stay env-gated.
 void UciDebug(const char* event) {
-    if (std::getenv("TRY4_TIME_DEBUG") == nullptr) {
+    if (!detail::ForensicsEnabled()) {
         return;
     }
     const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(

@@ -237,7 +237,10 @@ TEST_CASE("search honors movetime and clock budgets", "[search]") {
             .count();
     REQUIRE(clock_info.bestMove.has_value());
     REQUIRE(position.IsLegal(*clock_info.bestMove));
-    REQUIRE(clock_elapsed <= 250);
+    // Task 057 raised this budget's hard ceiling to 250 ms; the bound honors
+    // the documented "never exceeds the hard limit by more than 50 ms"
+    // contract (and a little of the abort-unwind latency).
+    REQUIRE(clock_elapsed <= 300);
 }
 
 TEST_CASE("stop flag returns a legal move promptly", "[search]") {

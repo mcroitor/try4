@@ -1,10 +1,10 @@
+#include "chess/forensics.hpp"
 #include "chess/time_manager.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 
 namespace chess {
 namespace {
@@ -22,7 +22,7 @@ std::int64_t Positive(std::optional<std::int64_t> value) {
 // tests assert that, so this must stay env-gated.
 void TimeDebug(const SearchLimits& limits, Color side, std::int64_t remaining,
                int moves_to_go, const TimeBudget& budget) {
-    if (std::getenv("TRY4_TIME_DEBUG") == nullptr) {
+    if (!detail::ForensicsEnabled()) {
         return;
     }
     const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
