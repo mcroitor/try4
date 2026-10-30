@@ -23,8 +23,21 @@
 #include "chess/time_manager.hpp"
 #include "chess/version.hpp"
 
+#include <cstdio>
+#include <cstdlib>
+
 namespace chess {
 namespace {
+
+// Match-forensics hook (TRY4_TIME_DEBUG=1): logs the adapter command flow to
+// stderr. Without the variable nothing is written; process tests assert a
+// clean stderr, so this must stay env-gated.
+void UciDebug(const char* event) {
+    if (std::getenv("TRY4_TIME_DEBUG") == nullptr) {
+        return;
+    }
+    std::fprintf(stderr, "uci: %s\n", event);
+}
 
 using Clock = std::chrono::steady_clock;
 using Ms = std::chrono::milliseconds;
@@ -356,6 +369,7 @@ void UciEngine::HandlePosition(const std::string& args) {
         }
     }
     position_ = std::move(candidate);
+    UciDebug("position: applied");
 }
 
 void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
@@ -367,7 +381,9 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     }
 
     // Stop any ongoing search.
+    UciDebug("go: parsed");
     Stop();
+    UciDebug("go: stop-join done");
 
     const auto tokens = Split(args, ' ');
     const bool analysis = std::find(tokens.begin(), tokens.end(), "infinite") != tokens.end() ||
@@ -421,6 +437,7 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     searching_.store(true, std::memory_order_release);
 
     // Pass the output stream to the search worker.
+    UciDebug("go: worker launch");
     search_thread_ = std::thread(&UciEngine::SearchWorker, this,
                                  std::cref(search_position_copy_),
                                  std::cref(*current_limits_),
@@ -535,6 +552,7 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
     const auto start_time = Clock::now();
 
     std::atomic_bool& stop = stop_flag_;
+    UciDebug("worker: search enter");
 #ifdef TRY4_SMP_POC
     // Task 048 PoC, variant A (private tables): helpers beside the main
     // worker. Each helper owns a Searcher with the configured hash divided
@@ -569,6 +587,7 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
         EmitInfo(out, progress, progress.depth, progress.nodes, elapsed_ms);
     };
     SearchInfo info = searcher_->Search(position, limits, stop, on_progress);
+    UciDebug("worker: search returned");
 
 #ifdef TRY4_SMP_POC
     std::uint64_t aggregate_nodes = info.nodes;
@@ -634,6 +653,7 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
         out.flush();
     }
     EmitBestMove(out, info, resign);
+    UciDebug("worker: bestmove emitted");
 
     searching_.store(false, std::memory_order_release);
 }
