@@ -36,7 +36,11 @@ void UciDebug(const char* event) {
     if (std::getenv("TRY4_TIME_DEBUG") == nullptr) {
         return;
     }
-    std::fprintf(stderr, "uci: %s\n", event);
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now().time_since_epoch())
+                         .count();
+    std::fprintf(stderr, "t=%lld uci: %s\n", static_cast<long long>(now),
+                 event);
 }
 
 using Clock = std::chrono::steady_clock;

@@ -1,6 +1,7 @@
 #include "chess/time_manager.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -16,16 +17,20 @@ std::int64_t Positive(std::optional<std::int64_t> value) {
 }
 
 // Forensic hook (set TRY4_TIME_DEBUG=1 to enable): logs every clock budget
-// decision to stderr as "budget rem= mtg= soft= hard=", for match
-// forensics in real managers. Empty stderr without the variable; tests
-// assert that, so this must stay env-gated.
+// decision to stderr as "t=<elapsed-ms> budget side= rem= mtg= soft= hard=",
+// for match forensics in real managers. Empty stderr without the variable;
+// tests assert that, so this must stay env-gated.
 void TimeDebug(const SearchLimits& limits, Color side, std::int64_t remaining,
                int moves_to_go, const TimeBudget& budget) {
     if (std::getenv("TRY4_TIME_DEBUG") == nullptr) {
         return;
     }
-    std::fprintf(stderr, "budget side=%s rem=%lld mtg=%d soft=%lld hard=%lld\n",
-                 side == Color::White ? "w" : "b",
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now().time_since_epoch())
+                         .count();
+    std::fprintf(stderr,
+                 "t=%lld budget side=%s rem=%lld mtg=%d soft=%lld hard=%lld\n",
+                 static_cast<long long>(now), side == Color::White ? "w" : "b",
                  static_cast<long long>(remaining), moves_to_go,
                  budget.softMs.has_value()
                      ? static_cast<long long>(*budget.softMs)
