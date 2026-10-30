@@ -9,9 +9,9 @@
 | **Priority** | P1 |
 | **Status** | Done |
 
-**Unblocked:** tasks 049-056 are `Done`. The TSCP match portion is recorded as
-blocked on external tooling (Cute Chess and TSCP are not installed on this
-machine); the ready-to-run procedure is below.
+**Unblocked:** tasks 049-056 are `Done`. Cute Chess 1.5.1 and TSCP 1.81e were
+installed on this machine during the close-out pass, so the match portion is
+recorded (see the completion report).
 
 ## Objective
 
@@ -158,9 +158,9 @@ stress run plus match complete without protocol failures.
 
 ## Completion report
 
-**Status:** Done for the budget/prediction/stress/report work; the TSCP match is
-blocked on absent external binaries (Cute Chess CLI and TSCP are not installed
-on this Windows machine). Nothing in the task was skipped silently.
+**Status:** Done for the budget/prediction/stress/report work including the
+recorded TSCP match (8 games at 60/120, try4 6-2-0; the two time forfeits are
+analyzed in the findings below with env-gated budget/flow forensics).
 
 **Budget rework** (`src/core/time_manager.cpp`, `include/chess/time_manager.hpp`):
 
@@ -201,17 +201,36 @@ sign verified), `docs/CONFIGURATION.md`, `CHANGELOG.md`, and this file.
 | 200-move 60/120 stress | Pass: zero forfeits, zero illegal moves, max move 3889 ms <= hard+50 |
 | movetime regression tests | Pass (`search honors movetime` test suite green) |
 | Prediction guard | Pass (no budget = no prediction; first iteration never skipped) |
-| Match | **Blocked:** needs Cute Chess CLI (`cutechess-cli`) and TSCP; not installed here |
-| Match result | Blocked with the match |
-| Report | `scripts/match_report.py` self-tested on a two-game PGN |
+| TSCP match | **Recorded** (`build/tscp-match.pgn`, Cute Chess 1.5.1 found on the machine): 8 games at the task's 60/120 control, **try4 6-2-0 vs TSCP 1.81e** (4-0 White, 2-2 Black), LOS 92.1%, Elo +190.8 [-87.2, 468.8]; terminations: 7 mates, 1 TSCP win by mate, 2 time forfeits (one each side); zero crashes or protocol failures |
+| Match result | 6-2-0 in try4's favor; see findings below |
+| Report | `scripts/match_report.py` on the 8-game PGN: ply range 24-404, median 334 |
 | Docs | CONFIGURATION/CHANGELOG updated; PERFORMANCE/ROADMAP pending the match numbers |
-| Full suite | Debug 27/27 pass |
+| Full suite | Debug 27/27 pass (28 with the task 034 SEE tests) |
 
 **Risks or follow-ups:**
 
-- The match procedure (recorded above in the task's reference section) is the
-  smallest next action once `cutechess-cli` and `tscp` are installed; the
-  report script and the PGN book are already in place.
+- **Match findings (the honest record).** The match was replayed five times
+  total while investigating the two forfeits with env-gated forensics
+  (`TRY4_TIME_DEBUG=1` logs every budget decision and every UCI command-flow
+  event to stderr; `scripts/`-side drivers in `build/tscp-debug.log`,
+  `build/try4-time.log`, `build/try4-flow.log`, `build/try4-time2.log`).
+  - TSCP chronically exceeds the 2 s-per-move classic budget (PGN
+    annotations: 3.1-5.0 s moves) and forfeited on time in two of five
+    replays; all decisive games were mate wins for whichever side kept its
+    clock together.
+  - try4's one on-time loss (record match game 2, ~84 s still on the clock
+    when the decision was due) did **not** reproduce in four instrumented
+    replays: across 147 measured budget cycles the engine's response stayed
+    inside the logged hard ceiling every time, and the UCI command flow
+    (go -> stop-join -> launch -> search -> bestmove) is gapless over full
+    games. The mechanism of that single loss is therefore unconfirmed;
+    candidates are a rare engine-side stall that predates the flow hooks or
+    manager-side timing effects under long decisive games.
+  - Smallest next action: a longer recorded match (50-100 games) with
+    `TRY4_TIME_DEBUG=1` on the engine's stderr plus per-move wall-clock
+    capture on the manager side, to catch the rare loss-of-decision if it is
+    real. The budget log shape (`t=<ms> budget side= rem= mtg= soft= hard=`)
+    makes the guilty move directly readable from the log.
 - The best-move-instability hard-extension is bounded only by the hard
   ceiling; that is by design.
 - The predictor's branching factor is per-search; a per-position learning
