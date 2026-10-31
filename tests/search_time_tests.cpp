@@ -103,6 +103,12 @@ TEST_CASE("TT use does not change the fixed-depth minimax result", "[search]") {
         FromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
     chess::SearchLimits with_tt;
     with_tt.depth = 3;
+    // Task 056 requirement 3: this is the fixed-depth exactness oracle from
+    // tasks 051/055, so every pruning technique is disabled here.
+    with_tt.pruning.useNullMove = false;
+    with_tt.pruning.useLateMoveReduction = false;
+    with_tt.pruning.useCheckExtension = false;
+    with_tt.pruning.useDeltaPruning = false;
     std::atomic_bool stop{false};
 
     chess::Searcher tt_searcher;
@@ -130,14 +136,15 @@ TEST_CASE("TT use does not change the fixed-depth minimax result", "[search]") {
     REQUIRE(tt_searcher.TranspositionTableMegabytes() == 2);
 }
 
-TEST_CASE("time budgets handle movetime, clocks, and increments",
-          "[search]") {
+TEST_CASE("time budgets handle movetime, clocks, and increments", "[search]") {
     chess::SearchLimits movetime;
     movetime.moveTimeMs = 100;
     const chess::TimeBudget fixed =
         chess::ComputeTimeBudget(movetime, chess::Color::White);
-    REQUIRE(fixed.softMs == 100);
-    REQUIRE(fixed.hardMs == 100);
+    // Task 057: an exact budget keeps its soft and hard at the same value,
+    // minus the 5 ms minimum safety margin (no overhead here).
+    REQUIRE(fixed.softMs == 95);
+    REQUIRE(fixed.hardMs == 95);
 
     chess::SearchLimits clock;
     clock.whiteTimeMs = 1000;
@@ -146,19 +153,56 @@ TEST_CASE("time budgets handle movetime, clocks, and increments",
     const chess::TimeBudget white =
         chess::ComputeTimeBudget(clock, chess::Color::White);
     REQUIRE(white.softMs == 100);
-    REQUIRE(white.hardMs == 200);
+    REQUIRE(white.hardMs == 250);
     const chess::TimeBudget black =
         chess::ComputeTimeBudget(clock, chess::Color::Black);
     REQUIRE(black.softMs == 200);
-    REQUIRE(black.hardMs == 400);
+    REQUIRE(black.hardMs == 500);
 
     chess::SearchLimits increment = clock;
     increment.whiteIncrementMs = 100;
     const chess::TimeBudget with_increment =
         chess::ComputeTimeBudget(increment, chess::Color::White);
-    REQUIRE(with_increment.softMs == 150);
-    REQUIRE(with_increment.hardMs == 300);
+    // soft = 1000/10 + 100*3/4 = 175; hard = min(500, 175*5/2) = 437.
+    REQUIRE(with_increment.softMs == 175);
+    REQUIRE(with_increment.hardMs == 437);
 
+    // The move overhead widens the safety margin and never breaks hard>=soft.
+    const chess::TimeBudget with_overhead =
+        chess::ComputeTimeBudget(increment, chess::Color::White, 20);
+    REQUIRE(with_overhead.softMs == 175);
+    REQUIRE(with_overhead.hardMs == 437);
+    REQUIRE(*with_overhead.softMs <= *with_overhead.hardMs);
+
+    // Tiny remaining clocks: safety first; budgets stay nonnegative and
+    // ordered even when all the slack is consumed.
+    chess::SearchLimits urgent = clock;
+    urgent.whiteTimeMs = 5;
+    urgent.blackTimeMs = 5;
+    const chess::TimeBudget tiny =
+        chess::ComputeTimeBudget(urgent, chess::Color::White);
+    REQUIRE(tiny.softMs.has_value());
+    REQUIRE(tiny.hardMs.has_value());
+    REQUIRE(*tiny.softMs >= 0);
+    REQUIRE(*tiny.hardMs >= *tiny.softMs);
+
+    chess::SearchLimits zero = clock;
+    zero.whiteTimeMs = 1;
+    zero.blackTimeMs = 1;
+    const chess::TimeBudget almost_zero =
+        chess::ComputeTimeBudget(zero, chess::Color::White);
+    REQUIRE(almost_zero.softMs.has_value() == almost_zero.hardMs.has_value());
+    REQUIRE(*almost_zero.softMs <= *almost_zero.hardMs);
+
+    // movestogo 1 uses the whole remaining time as the per-move share.
+    chess::SearchLimits sudden = clock;
+    sudden.movesToGo = 1;
+    const chess::TimeBudget one_move =
+        chess::ComputeTimeBudget(sudden, chess::Color::White);
+    REQUIRE(one_move.softMs == 500);
+    REQUIRE(one_move.hardMs == 500);
+
+    // A missing clock produces no limit.
     REQUIRE_FALSE(chess::ComputeTimeBudget(chess::SearchLimits{},
                                            chess::Color::White)
                       .HasLimit());
@@ -193,7 +237,10 @@ TEST_CASE("search honors movetime and clock budgets", "[search]") {
             .count();
     REQUIRE(clock_info.bestMove.has_value());
     REQUIRE(position.IsLegal(*clock_info.bestMove));
-    REQUIRE(clock_elapsed <= 250);
+    // Task 057 raised this budget's hard ceiling to 250 ms; the bound honors
+    // the documented "never exceeds the hard limit by more than 50 ms"
+    // contract (and a little of the abort-unwind latency).
+    REQUIRE(clock_elapsed <= 300);
 }
 
 TEST_CASE("stop flag returns a legal move promptly", "[search]") {

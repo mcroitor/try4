@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include "chess/configuration.hpp"
+#include "chess/search.hpp"
+#include "chess/uci.hpp"
 
 TEST_CASE("Configuration example and normalized snapshot preserve defaults", "[config]") {
     std::string error;
@@ -32,13 +34,21 @@ TEST_CASE("Configuration parses BOM CRLF paths and parameter arrays", "[config]"
 }
 
 TEST_CASE("Malformed config is rejected with location and useful reason", "[config]") {
-    for (const std::string text : {
-        "bad", "[bad]\na=1", "[uci]\nthreads=2", "[uci]\nhash_mb=0",
+    const std::string invalid_samples[] = {
+        "bad", "[bad]\na=1",
+#ifdef TRY4_SMP_POC
+        // Task 048 PoC: threads=2 is valid here; the 1-4 range tests live in
+        // the thread-count case below.
+#else
+        "[uci]\nthreads=2",
+#endif
+        "[uci]\nhash_mb=0",
         "[uci]\nhash_mb=99999999999999999999", "[uci]\nown_book=TRUE",
         "[uci]\nhash_mb=32garbage", "[uci]\nhash_mb=32\nhash_mb=16",
         "[evaluation]\nmaterial_mg=1,2", "[evaluation]\nmaterial_mg=0,100,320,330,500,900,1",
         "[evaluation]\npassed_mg=0,1,,2,3,4,5,0", "[evaluation]\ntempo=-1",
-        "[search]\nforcing_max_plies=33\nforcing_hard_plies=32", "[uci]\nbook_file=\xff"}) {
+        "[search]\nforcing_max_plies=33\nforcing_hard_plies=32", "[uci]\nbook_file=\xff"};
+    for (const std::string& text : invalid_samples) {
         std::istringstream stream(text);
         std::string error;
         const auto options = chess::ParseConfiguration(stream, "bad.ini", &error);
@@ -50,6 +60,27 @@ TEST_CASE("Malformed config is rejected with location and useful reason", "[conf
 }
 
 TEST_CASE("Unsupported thread counts are explained", "[config]") {
+#ifdef TRY4_SMP_POC
+    // Task 048 PoC: 1-4 accepted (2 exercised below), everything else is
+    // rejected with the range in the message.
+    {
+        std::istringstream stream("[uci]\nthreads=2\n");
+        std::string error;
+        const auto options = chess::ParseConfiguration(stream, "try4.ini", &error);
+        INFO(error);
+        REQUIRE(options.has_value());
+        REQUIRE(options->threads == 2);
+    }
+    for (const std::string value : {"0", "5", "8"}) {
+        std::istringstream stream("[uci]\nthreads=" + value);
+        std::string error;
+        const auto options = chess::ParseConfiguration(stream, "try4.ini", &error);
+        INFO(error);
+        REQUIRE_FALSE(options);
+        REQUIRE(error.find("try4.ini:2: uci.threads=" + value) == 0);
+        REQUIRE(error.find("range 1-4") != std::string::npos);
+    }
+#else
     for (const std::string value : {"0", "2", "8"}) {
         std::istringstream stream("[uci]\nthreads=" + value);
         std::string error;
@@ -59,6 +90,7 @@ TEST_CASE("Unsupported thread counts are explained", "[config]") {
         REQUIRE(error.find("try4.ini:2: uci.threads=" + value) == 0);
         REQUIRE(error.find("only one search thread is implemented") != std::string::npos);
     }
+#endif
 }
 
 TEST_CASE("Configured evaluation changes targeted terms and isolates engines", "[config][evaluation]") {
@@ -107,5 +139,67 @@ TEST_CASE("Search invalidates cached scores for evaluation and forcing policies"
     const auto reference = fresh.Search(*position, limits, stop);
     REQUIRE(changed.scoreCp == reference.scoreCp);
     REQUIRE(changed.scoreCp != initial.scoreCp);
+    REQUIRE(*position == *chess::Position::FromFen(position->ToFen()));
+}
+
+TEST_CASE("Search parses resign threshold and records it in the snapshot", "[config][search][resign]") {
+    std::istringstream input("[search]\nresign_cp=-400\n");
+    std::string error;
+    const auto parsed = chess::ParseConfiguration(input, "test.ini", &error);
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->resign_cp == -400);
+    REQUIRE(chess::ConfigurationSnapshot(*parsed).find("resign_cp=-400") != std::string::npos);
+
+    std::istringstream disabled("[search]\nresign_cp=0\n");
+    const auto off = chess::ParseConfiguration(disabled, "test.ini", &error);
+    REQUIRE(off.has_value());
+    REQUIRE(off->resign_cp == 0);
+
+    std::istringstream low("[search]\nresign_cp=-100001\n");
+    const auto rejected = chess::ParseConfiguration(low, "test.ini", &error);
+    REQUIRE_FALSE(rejected.has_value());
+    REQUIRE(error.find("test.ini") != std::string::npos);
+
+    std::istringstream high("[search]\nresign_cp=1\n");
+    REQUIRE_FALSE(chess::ParseConfiguration(high, "test.ini", &error).has_value());
+
+    std::istringstream malformed("[search]\nresign_cp=-600x\n");
+    REQUIRE_FALSE(chess::ParseConfiguration(malformed, "test.ini", &error).has_value());
+
+    std::istringstream duplicate("[search]\nresign_cp=-600\nresign_cp=-500\n");
+    REQUIRE_FALSE(chess::ParseConfiguration(duplicate, "test.ini", &error).has_value());
+
+    // The built-in default is the documented -600.
+    chess::SearchInfo default_info;
+    default_info.depth = 1;
+    default_info.scoreCp = -600;
+    CHECK(chess::ShouldResign(default_info, -600) == false);  // equality holds
+    CHECK(chess::ShouldResign(default_info, -599) == true);   // -601 < -599
+    default_info.scoreCp = -601;
+    CHECK(chess::ShouldResign(default_info, -600) == true);
+    CHECK(chess::ShouldResign(default_info, 0) == false);      // disabled
+    CHECK(chess::ShouldResign(default_info, -100001) == false);  // out of range
+    default_info.depth = 0;
+    CHECK(chess::ShouldResign(default_info, -600) == false);   // no iteration
+    default_info.depth = 1;
+    default_info.scoreCp = chess::kMateScore - 1;
+    CHECK(chess::ShouldResign(default_info, -600) == false);   // positive mate
+    default_info.scoreCp = -(chess::kMateScore - 1);
+    CHECK(chess::ShouldResign(default_info, -600) == true);    // negative mate
+}
+
+TEST_CASE("Search invalidates cached scores for pruning policies", "[config][search]") {
+    auto position = chess::Position::FromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+    REQUIRE(position);
+    chess::SearchLimits limits;
+    limits.depth = 3;
+    chess::Searcher reused;
+    std::atomic_bool stop{false};
+    const auto initial = reused.Search(*position, limits, stop);
+    limits.pruning.useNullMove = !limits.pruning.useNullMove;
+    chess::Searcher fresh;
+    const auto changed = reused.Search(*position, limits, stop);
+    const auto reference = fresh.Search(*position, limits, stop);
+    REQUIRE(changed.scoreCp == reference.scoreCp);
     REQUIRE(*position == *chess::Position::FromFen(position->ToFen()));
 }

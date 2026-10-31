@@ -95,6 +95,15 @@ public:
     // identical to MakeMove(). Always returns true when the precondition holds.
     bool MakeMoveAssumeLegal(const Move& move);
 
+    // Applies the null move ("pass") used by guarded null-move pruning.
+    // Precondition: the side to move is not in check and the position has a
+    // legal continuation (the caller never nulls in check or at terminal
+    // nodes). The board, castling rights and clocks are untouched; the side
+    // to move flips and the en passant target clears. A history entry is
+    // pushed so the paired UndoMove() restores the exact state, and the pass
+    // itself never records a repetition.
+    bool MakeNullMove();
+
     // True when the current position has appeared at least three times in the
     // game history. This scan uses the incrementally maintained 64-bit Zobrist
     // hash and does not copy positions. The hash covers piece placement, side

@@ -92,7 +92,7 @@ bool Assign(UciOptions* options, const std::string& section,
             o.hash_mb = static_cast<std::size_t>(number); return true;
         }
         if (key == "move_overhead_ms") { return Integer(value, &o.move_overhead_ms, 0, 5000); }
-        if (key == "threads") { return Integer(value, &o.threads, 1, 1); }
+        if (key == "threads") { return Integer(value, &o.threads, 1, kMaxUciThreads); }
         if (key == "book_max_ply") { return Integer(value, &o.book_max_ply, 0, 10000); }
     } else if (section == "evaluation") {
         auto& p = o.evaluation;
@@ -104,6 +104,7 @@ bool Assign(UciOptions* options, const std::string& section,
             if (key == kWeightNames[i]) { return Integer(value, &p.weights[i], 0, 1000); }
         }
     } else if (section == "search") {
+        if (key == "resign_cp") { return Integer(value, &o.resign_cp, -100000, 0); }
         if (key == "forcing_checks") { return Boolean(value, &o.forcing.checks); }
         if (key == "forcing_max_plies") { return Integer(value, &o.forcing.max_plies, 0, 120); }
         if (key == "forcing_hard_plies") { return Integer(value, &o.forcing.hard_plies, 1, 120); }
@@ -157,9 +158,14 @@ std::optional<UciOptions> ParseConfiguration(std::istream& input,
         if (!seen.insert(section + "." + key).second) { return fail("duplicate key " + section + "." + key); }
         if (section == "uci" && key == "threads") {
             int threads = 0;
-            if (!Integer(value, &threads, 1, 1)) {
+            if (!Integer(value, &threads, 1, kMaxUciThreads)) {
+#if defined(TRY4_SMP_POC)
+                return fail("uci.threads=" + value +
+                            " is not in the supported range 1-4 (task 048 PoC)");
+#else
                 return fail("uci.threads=" + value +
                             " is not supported; only one search thread is implemented");
+#endif
             }
         }
         if (!Assign(&result, section, key, value)) { return fail("unknown key or invalid value: " + section + "." + key); }
@@ -218,7 +224,8 @@ std::string ConfigurationSnapshot(const UciOptions& o) {
     array("material_mg", o.evaluation.material_mg); array("material_eg", o.evaluation.material_eg);
     array("passed_mg", o.evaluation.passed_mg); array("passed_eg", o.evaluation.passed_eg);
     for (std::size_t i = 0; i < std::size(kWeightNames); ++i) { out << kWeightNames[i] << '=' << o.evaluation.weights[i] << '\n'; }
-    out << "[search]\nforcing_checks=" << (o.forcing.checks ? "true" : "false")
+    out << "[search]\nresign_cp=" << o.resign_cp
+        << "\nforcing_checks=" << (o.forcing.checks ? "true" : "false")
         << "\nforcing_max_plies=" << o.forcing.max_plies << "\nforcing_hard_plies=" << o.forcing.hard_plies << '\n';
     return out.str();
 }

@@ -1,14 +1,14 @@
-# Task 030 — Implement UCI position/go/stop/quit with asynchronous search
+﻿# Task 030 â€” Implement UCI position/go/stop/quit with asynchronous search
 
 | Field | Value |
 |---|---|
 | **ID** | 030 |
 | **File** | `task_000000000000000000000000000030.md` |
-| **Stage** | 6 — UCI and playable engine |
+| **Stage** | 6 â€” UCI and playable engine |
 | **Depends on** | 029 |
 | **Estimate** | 2 days |
 | **Priority** | P1 |
-| **Status** | Ready |
+| **Status** | Done |
 
 ## Objective
 

@@ -64,9 +64,17 @@ UTF-8/NUL, lines over 64 KiB, and invalid ranges fail with file/line/key context
   scores are clamped to ±90000, below the mate band. Invalid direct API settings
   return neutral evaluation; file input reports an error before any search.
 
-`[search]`: `forcing_checks` (false), `forcing_max_plies` (0–120, default 8),
+`[search]`: `resign_cp` (-100000..0, default -600; 0 disables; task 058),
+`forcing_checks` (false), `forcing_max_plies` (0–120, default 8),
 `forcing_hard_plies` (1–120, default 32). Max must not exceed hard.
 See [FORCING_SEARCH.md](FORCING_SEARCH.md) before increasing the checking budget.
+Time budgets (task 057): `soft = min(remaining/2, remaining/moves_to_go + inc*3/4)`,
+`hard = max(soft, min(min(remaining/2, soft*5/2), remaining - safety))` with
+`safety = move_overhead_ms + max(5, remaining/100)`; `movetime` is an exact
+budget. Between iterations a predictor scales the previous iteration's time by
+a measured branching factor (clamped 1.5-4.0, fallback 2.0) and skips an
+iteration only when the prediction cannot fit the hard ceiling; a best-move
+instability may extend a soft-expired search up to hard.
 
 Example to enable forcing checks and a different knight value:
 

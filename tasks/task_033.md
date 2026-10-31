@@ -10,6 +10,22 @@
 | **Priority** | P2 |
 | **Status** | Ready |
 
+**Deferral note (2026-10, remaining-task chain pass).** This is the only task
+left open in the 001-058 chain. It was not started in the late-October
+strength pass (tasks 057, 058, 034, 048 and 035's close-out) because it is a
+multi-day full representation rewrite (movegen, position, incremental state)
+where a half-landed state is worse than a clean deferral. Two findings from
+this pass raise its expected value and belong in its plan:
+1. the SEE measurements (`tasks/task_034.md`) now provide a concrete
+   re-land target: SEE pruning is implemented and switchable
+   (`useStaticExchangePruning`), but its per-node cost is roughly double on
+   0x88 board copies; bitboards drop that cost and the A/B should be re-run
+   immediately after migration;
+2. `scripts/smp_benchmark.py` and the PoC build give a ready NPS harness for
+   the per-node-rate comparison.
+Safety net stays as documented: the perft suite plus the fixed-depth/tactical
+corpus exactness gates.
+
 ## Objective
 
 Replace the 0x88 internals with bitboards for speed while keeping the

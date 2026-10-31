@@ -26,6 +26,7 @@ this does not claim GUI-specific latency or universal GUI compatibility.
 | Hash | 16 MB | Transposition table size; advertised range 1–131072. |
 | Move Overhead | 20 ms | Subtracted from movetime when movetime exceeds the overhead. |
 | Threads | 1 | Search is single-threaded. |
+| Resign | -600 cp | Task 058: resign when the completed score is below the threshold; range -100000..0; 0 disables. |
 | OwnBook | true | Book use requires a selected BookFile. |
 | BookFile | empty | Polyglot `.bin` or `<id><TAB><UCI moves>` `.txt`. |
 | BookMaxPly | 40 | Half-move cutoff; 0 means unlimited. |
@@ -62,6 +63,21 @@ emits one `info depth ...` line after each completed iterative-deepening
 iteration, followed by `bestmove` when the search ends. If no iteration
 completes (a terminal root, an immediate stop, or a zero budget), a single
 `info depth 0` line is emitted before `bestmove`.
+
+## Resignation
+
+The engine resigns under the `Resign` option (default -600 cp, `0` disables)
+when a search's last completed iteration scored below the threshold, the
+search was not cancelled, was not `go infinite`, and the move was not a book
+move. The signal is protocol-native `bestmove 0000`, preceded by exactly one
+diagnostic:
+
+    info string resign score cp -1452 threshold -600
+    bestmove 0000
+
+A negative mate score is reported in mate notation (`score mate -N`); positive
+mate scores never resign. Startup value: `[search] resign_cp`. A terminal root
+still emits `bestmove 0000` without a resign diagnostic.
 
 ## Protocol behavior and remaining limitations
 

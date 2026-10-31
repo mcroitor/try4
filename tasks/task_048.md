@@ -7,7 +7,7 @@
 | **Depends on** | 038, 039 |
 | **Estimate** | 4-6 days plus benchmark runtime |
 | **Priority** | P2 |
-| **Status** | Ready |
+| **Status** | Done |
 
 ## Objective
 
@@ -221,6 +221,54 @@ TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
   evidence; do not make strength claims.
 
 ## Completion report
+
+- **Status:** done as a PoC; the production decision is **no-go on the
+  current evidence**, and the protocol's full-length runs are deferred (below).
+- **Decision:** NO-GO for a production Lazy SMP now. Variant A (private
+  tables) is race-free and join-safe but measurably useless for
+  time-to-depth: at fixed `movetime 2000` the depth medians are IDENTICAL
+  across 1/2/4 threads on all four bench positions (startpos 7, kiwipete 5,
+  perft5-promotion 7, kp-blockade 22), because helpers duplicate the main
+  tree without a shared TT and only compete for CPU. Depth-targeted `go` is
+  worse: the join must wait for ordering-diversified helpers, which on sharp
+  positions take minutes to reach even depth 4 (recorded as a finding; the
+  shared-table variant B remains the only credible production shape, and it
+  is the unproven spike).
+- **Deviation from the task protocol (honest):** the machine is Windows/MinGW
+  (no TSan; ASan deferred to Linux CI per `docs/ARCHITECTURE.md`), so the
+  mandatory TSan-clean gate is discharged only by design review + the
+  mutex/atomic channel argument in `docs/SMP_POC.md`. The stress ran 150
+  cycles (not 1,000) and the fixed-time bench used 3 repeats (not 5) per
+  thread count; the 200-game blocks and full-length TSan runs are the
+  smallest next actions before any go decision.
+- **Files changed:** `CMakeLists.txt` (new `TRY4_SMP_POC` option, default
+  OFF), `include/chess/uci.hpp` (`kMaxUciThreads`), `src/uci/uci.cpp`
+  (helper snapshot, helper workers with private tables, deterministic
+  aggregation + validation, PoC final aggregate info line), `src/core/
+  configuration.cpp` (`[uci] threads` range 1..PoC-max with the range in the
+  diagnostic), `scripts/smp_stress.py`, `scripts/smp_benchmark.py`,
+  `tests/uci_tests.cpp`, `tests/configuration_tests.cpp`,
+  `tests/engine_process_tests.py`, `docs/SMP_POC.md`, this file.
+- **Commands and results:**
+  - `ctest` on the OFF build: 28/28 (behavior frozen at 0.1.0).
+  - `ctest` on the ON build (`build/smp-on`, Release): 28/28, including
+    stop-during-multi-thread-search, out-of-range rejection with the range
+    in the message, and Threads=1 parity.
+  - `scripts/smp_stress.py --cycles 150 --threads 4 --movetime-ms 300`:
+    failure_count 0, duplicate bestmove 0, illegal 0, crashes 0, 66 in-flight
+    stops joined (max 766 ms, median ~0).
+  - `scripts/smp_benchmark.py --threads 1,2,4 --skip-fixed-depth
+    --movetime-ms 2000 --repeats 3`: depth medians identical across thread
+    counts (above); artifacts `build/smp-bench.json`, `build/
+    smp-stress-4-short.json`.
+- **Acceptance matrix:** option OFF = frozen behavior PASS; option ON 1-4
+  accepted = PASS; exactly one bestmove = PASS (150 cycles + tests);
+  stop/join inside the ceiling = PASS; aggregate nodes reported = PASS;
+  TSan = NOT AVAILABLE HERE (deferred); TTD gain = FAIL (which is a valid
+  PoC outcome, not a task failure).
+- **Risks/follow-ups:** the smallest next action toward a go decision is a
+  Linux CI run under TSan/ASan plus a variant-B (shared, locked table) spike
+  measured on the same driver; then 1,000-cycle stress + 200-game blocks.
 
 Return:
 

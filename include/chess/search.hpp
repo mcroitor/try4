@@ -35,6 +35,73 @@ struct ForcingSearchSettings {
     bool operator!=(const ForcingSearchSettings& other) const { return !(*this == other); }
 };
 
+// Selective pruning techniques. Each one is individually switchable so a
+// regression can be attributed by A/B testing a single technique. Pruning is
+// approximate by construction: it may change fixed-depth scores (never the
+// reported mate exactness of the tactical corpus), which is why the defaults
+// were selected from the measured A/B evidence recorded in task 056.
+struct PruningSettings {
+    // Null move: the mover passes once and the child proves the mover can
+    // still reach beta even with the opponent's extra move. Guarded by the
+    // search itself: never at the root, never in check, never below depth 3, never in all-pawn
+    // endings (zugzwang) and never on windows that reach the mate band.
+    bool useNullMove = true;
+    int nullMoveReduction = 2;  // Probe depth = depth - 1 - this.
+
+    // Late-move reductions: quiet, non-first moves past the move-number
+    // threshold are searched shallower; a fail-high triggers a full-depth
+    // re-search. The hash move, captures, promotions, giving-check moves and
+    // moves made while in check are never reduced. Off by default: the A/B
+    // evidence in task 056 shows that reduced probes cannot see quiet mating
+    // setups that arrive late in the move order (the curated KRK and KQK
+    // mate fixtures regress), and the tactical corpus is authoritative.
+    bool useLateMoveReduction = false;
+    int lateMoveReductionMinDepth = 3;
+    int lateMoveReductionMinMoveNumber = 4;
+
+    // Check extensions: search a check evasion one ply deeper, bounded by a
+    // per-line extension budget on top of the kMaxPly guard. Off by default:
+    // the A/B evidence in task 056 shows check cascades inflate the node
+    // count of check-heavy positions (in-check +85% at the same depth) and
+    // can even cost a ply at fixed time (queen-endgame 8 -> 7), while the
+    // tactical corpus is unaffected by turning it off.
+    bool useCheckExtension = false;
+    int checkExtensionCap = 4;
+
+    // Delta pruning in quiescence: skip a capture that cannot raise alpha even
+    // with this margin above the captured value. Never applied in check or
+    // when alpha is near a mate score.
+    bool useDeltaPruning = true;
+    int deltaPruningMargin = 200;
+
+    // Static-exchange pruning of quiescence captures (task 034): skip a
+    // capture the SEE proves loses material. Never applied in check, to
+    // promotions, or when alpha is near the mate band. Off by default with
+    // recorded evidence: on this 0x88 engine a SEE call costs one board copy
+    // plus an attacker scan per quiescence capture, roughly doubling the
+    // per-node rate, so the node savings turn into a one-ply loss at fixed
+    // time on four of eight bench positions (startpos, perft5-promotion,
+    // queen-endgame, in-check). Revisit with bitboards (task 033).
+    bool useStaticExchangePruning = false;
+
+    bool operator==(const PruningSettings& other) const {
+        return useNullMove == other.useNullMove &&
+               nullMoveReduction == other.nullMoveReduction &&
+               useLateMoveReduction == other.useLateMoveReduction &&
+               lateMoveReductionMinDepth == other.lateMoveReductionMinDepth &&
+               lateMoveReductionMinMoveNumber ==
+                   other.lateMoveReductionMinMoveNumber &&
+               useCheckExtension == other.useCheckExtension &&
+               checkExtensionCap == other.checkExtensionCap &&
+               useDeltaPruning == other.useDeltaPruning &&
+               deltaPruningMargin == other.deltaPruningMargin &&
+               useStaticExchangePruning == other.useStaticExchangePruning;
+    }
+    bool operator!=(const PruningSettings& other) const {
+        return !(*this == other);
+    }
+};
+
 struct SearchLimits {
     // Omitted depth uses a small deterministic default (4) for unbounded
     // searches and a high iteration cap when a clock or movetime is present.
@@ -72,6 +139,10 @@ struct SearchLimits {
 
     // The table belongs to the Searcher; disabling it is useful for A/B tests.
     bool useTranspositionTable = true;
+
+    // Selective pruning guards and thresholds. Disabling everything returns
+    // the task 055 search exactly, which stays the A/B oracle for this task.
+    PruningSettings pruning;
 
     // Principal-variation search windows every interior move after the first
     // with a zero window (alpha, alpha + 1) and re-searches it with the full

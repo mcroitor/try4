@@ -5,6 +5,18 @@ only when its tag and release report exist.
 
 ## [Unreleased]
 
+### Added
+
+- Task 058: configurable resignation. `[search] resign_cp` (default -600, 0
+  disables) and the UCI `Resign` spin option; a completed search below the
+  threshold emits `info string resign ...` followed by `bestmove 0000`.
+  Benchmarks and forcing/tactical measurements disable it explicitly.
+- Task 057: reworked clock budget (`soft`/`hard`/safety formula with the move
+  overhead), an iteration-start predictor with a measured branching factor
+  and a best-move-instability extension to the hard ceiling; the
+  `scripts/match_report.py` PGN match reporter and a PGN opening book for
+  managed matches.
+
 ### Changed
 
 - UCI now emits one `info depth ...` line after each completed iterative-deepening

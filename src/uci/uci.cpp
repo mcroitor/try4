@@ -20,14 +20,128 @@
 #include "chess/opening_book.hpp"
 #include "chess/position.hpp"
 #include "chess/search.hpp"
+#include "chess/forensics.hpp"
 #include "chess/time_manager.hpp"
 #include "chess/version.hpp"
+
+#include <cstdio>
 
 namespace chess {
 namespace {
 
+// Match-forensics hook (TRY4_TIME_DEBUG=1): logs the adapter command flow to
+// stderr. Without the variable nothing is written; process tests assert a
+// clean stderr, so this must stay env-gated.
+void UciDebug(const char* event) {
+    if (!detail::ForensicsEnabled()) {
+        return;
+    }
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now().time_since_epoch())
+                         .count();
+    std::fprintf(stderr, "t=%lld uci: %s\n", static_cast<long long>(now),
+                 event);
+}
+
 using Clock = std::chrono::steady_clock;
 using Ms = std::chrono::milliseconds;
+
+// Task 058: the resignation diagnostic reuses the mate-distance formatting of
+// EmitInfo; a negative mate score prints via the mate notation, anything else
+// as plain centipawns.
+std::string ResignDiagnostic(const SearchInfo& info, int threshold) {
+    std::ostringstream oss;
+    if (std::abs(info.scoreCp) >= kMateThreshold) {
+        const int distance = (kMateScore - std::abs(info.scoreCp) + 1) / 2;
+        oss << "score mate " << (info.scoreCp < 0 ? -distance : distance);
+    } else {
+        oss << "score cp " << info.scoreCp;
+    }
+    oss << " threshold " << threshold;
+    return oss.str();
+}
+
+#ifdef TRY4_SMP_POC
+// Task 048 PoC, variant A (private tables): helpers hold their own Searcher
+// with the configured hash divided across workers; the same position, stop
+// flag and budgets as the main worker; move ordering disabled so the helper's
+// tree differs from the main worker's without changing any ordering policy.
+// The only cross-thread channel is this snapshot (guarded by its own mutex);
+// a helper's iteration may claim the snapshot only with a strictly deeper
+// depth, or the same depth and a strictly better score, which keeps the
+// aggregation order deterministic: the main worker's own iteration (the
+// authoritative path) always beats an equal-depth-equal-score helper.
+class HelperSnapshot {
+public:
+    bool TryPublish(int depth, int score_cp, std::uint64_t nodes,
+                    const std::vector<Move>& pv) {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        if (depth < depth_ || (depth == depth_ && score_cp <= score_)) {
+            return false;
+        }
+        depth_ = depth;
+        score_ = score_cp;
+        nodes_ = nodes;
+        pv_ = pv;
+        return true;
+    }
+
+    bool HasResult() const {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        return depth_ > 0;
+    }
+
+    int Depth() const {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        return depth_;
+    }
+
+    int ScoreCp() const {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        return score_;
+    }
+
+    std::uint64_t NodesAtClaim() const {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        return nodes_;
+    }
+
+    SearchInfo ToInfo() const {
+        SearchInfo info;
+        const std::lock_guard<std::mutex> lock(mutex_);
+        info.depth = depth_;
+        info.scoreCp = score_;
+        info.pv = pv_;
+        if (!pv_.empty()) {
+            info.bestMove = pv_.front();
+        }
+        return info;
+    }
+
+private:
+    mutable std::mutex mutex_;
+    int depth_ = 0;
+    int score_ = 0;
+    std::uint64_t nodes_ = 0;
+    std::vector<Move> pv_;
+};
+
+SearchInfo HelperWorker(const Position& position, SearchLimits limits,
+                        std::size_t hash_mb_per_worker,
+                        std::atomic_bool& stop, HelperSnapshot* snapshot) {
+    limits.useMoveOrdering = false;
+    Searcher helper(std::max<std::size_t>(1, hash_mb_per_worker));
+    SearchInfo last;
+    const SearchProgressCallback on_progress =
+        [&](const SearchInfo& progress) {
+            last = progress;
+            snapshot->TryPublish(progress.depth, progress.scoreCp,
+                                 progress.nodes, progress.pv);
+        };
+    helper.Search(position, limits, stop, on_progress);
+    return last.depth > 0 ? last : snapshot->ToInfo();
+}
+#endif
 
 std::string Trim(std::string_view text) {
     std::size_t begin = 0;
@@ -119,8 +233,12 @@ void UciEngine::SetOption(const std::string& name, const std::string& value) {
         if (auto ms = ParseInt(value); ms.has_value() && *ms >= 0 && *ms <= 5000) {
             options_.move_overhead_ms = static_cast<int>(*ms);
         }
+    } else if (name == "Resign") {
+        if (auto cp = ParseInt(value); cp.has_value() && *cp >= -100000 && *cp <= 0) {
+            options_.resign_cp = static_cast<int>(*cp);
+        }
     } else if (name == "Threads") {
-        if (auto t = ParseInt(value); t.has_value() && *t == 1) {
+        if (auto t = ParseInt(value); t.has_value() && *t >= 1 && *t <= kMaxUciThreads) {
             options_.threads = static_cast<int>(*t);
         }
     }
@@ -176,10 +294,13 @@ void UciEngine::HandleUci(std::ostream& out) {
     out << "id author try4\n";
     out << "option name Hash type spin default " << startup_options_.hash_mb << " min 1 max 131072\n";
     out << "option name Move Overhead type spin default " << startup_options_.move_overhead_ms << " min 0 max 5000\n";
-    out << "option name Threads type spin default 1 min 1 max 1\n";
+    out << "option name Threads type spin default 1 min 1 max "
+        << kMaxUciThreads << '\n';
     out << "option name OwnBook type check default " << (startup_options_.book_enabled ? "true" : "false") << '\n';
     out << "option name BookFile type string default " << (startup_options_.book_path.empty() ? "<empty>" : startup_options_.book_path) << '\n';
     out << "option name BookMaxPly type spin default " << startup_options_.book_max_ply << " min 0 max 10000\n";
+    out << "option name Resign type spin default " << startup_options_.resign_cp
+        << " min -100000 max 0 (0 disables resignation)\n";
     out << "uciok\n" << std::flush;
 }
 
@@ -252,6 +373,7 @@ void UciEngine::HandlePosition(const std::string& args) {
         }
     }
     position_ = std::move(candidate);
+    UciDebug("position: applied");
 }
 
 void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
@@ -263,7 +385,9 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     }
 
     // Stop any ongoing search.
+    UciDebug("go: parsed");
     Stop();
+    UciDebug("go: stop-join done");
 
     const auto tokens = Split(args, ' ');
     const bool analysis = std::find(tokens.begin(), tokens.end(), "infinite") != tokens.end() ||
@@ -295,6 +419,7 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     SearchLimits limits = parsed->limits;
     limits.evaluation = options_.evaluation;
     limits.forcing = options_.forcing;
+    limits.pruning = PruningSettings{};
     limits.useMoveOrdering = true;
     limits.useQuiescence = true;
     limits.useTranspositionTable = true;
@@ -316,6 +441,7 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     searching_.store(true, std::memory_order_release);
 
     // Pass the output stream to the search worker.
+    UciDebug("go: worker launch");
     search_thread_ = std::thread(&UciEngine::SearchWorker, this,
                                  std::cref(search_position_copy_),
                                  std::cref(*current_limits_),
@@ -430,12 +556,75 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
     const auto start_time = Clock::now();
 
     std::atomic_bool& stop = stop_flag_;
+    UciDebug("worker: search enter");
+#ifdef TRY4_SMP_POC
+    // Task 048 PoC, variant A (private tables): helpers beside the main
+    // worker. Each helper owns a Searcher with the configured hash divided
+    // across workers, the same position, budgets and broadcast stop flag;
+    // ordering stays off in the helper so its tree differs from the main
+    // worker's. Helpers join before any bestmove; helper nodes aggregate.
+    const int workers = std::min(kMaxUciThreads, std::max(1, options_.threads));
+    const int helper_count = std::max(0, workers - 1);
+    HelperSnapshot snapshot;
+    std::vector<std::thread> helper_threads;
+    std::array<std::optional<SearchInfo>, kMaxUciThreads - 1> helper_results{};
+    if (helper_count > 0) {
+        const std::size_t hash_mb_per_worker =
+            std::max<std::size_t>(1, options_.hash_mb /
+                                         static_cast<std::size_t>(workers));
+        helper_threads.reserve(static_cast<std::size_t>(helper_count));
+        for (int index = 0; index < helper_count; ++index) {
+            helper_threads.emplace_back([&, index]() {
+                SearchLimits helper_limits = limits;
+                helper_limits.useMoveOrdering = false;
+                helper_results[static_cast<std::size_t>(index)] =
+                    HelperWorker(position, helper_limits, hash_mb_per_worker,
+                                 stop, &snapshot);
+            });
+        }
+    }
+#endif
+
     const SearchProgressCallback on_progress = [&](const SearchInfo& progress) {
         const auto elapsed_ms =
             std::chrono::duration_cast<Ms>(Clock::now() - start_time).count();
         EmitInfo(out, progress, progress.depth, progress.nodes, elapsed_ms);
     };
-    const SearchInfo info = searcher_->Search(position, limits, stop, on_progress);
+    SearchInfo info = searcher_->Search(position, limits, stop, on_progress);
+    UciDebug("worker: search returned");
+
+#ifdef TRY4_SMP_POC
+    std::uint64_t aggregate_nodes = info.nodes;
+    for (std::thread& thread : helper_threads) {
+        thread.join();
+    }
+    for (const auto& helper_result : helper_results) {
+        if (helper_result.has_value()) {
+            aggregate_nodes += helper_result->nodes;
+        }
+    }
+    // A helper may win only with a strictly deeper completed iteration, or
+    // the same depth with a strictly better score; equal results keep the
+    // main worker's iteration (deterministic). The helper's move is checked
+    // against the root before it can be reported.
+    if (snapshot.Depth() > info.depth ||
+        (snapshot.Depth() == info.depth && snapshot.ScoreCp() > info.scoreCp)) {
+        const SearchInfo candidate = snapshot.ToInfo();
+        if (candidate.bestMove.has_value() &&
+            position.IsLegal(*candidate.bestMove)) {
+            info = candidate;
+        }
+    }
+    info.nodes = aggregate_nodes;
+    // PoC protocol: one final info line with the aggregated node total, so
+    // drivers can measure aggregate NPS without parsing per-worker streams.
+    if (helper_count > 0) {
+        EmitInfo(out, info, info.depth, info.nodes,
+                 std::chrono::duration_cast<Ms>(Clock::now() - start_time)
+                     .count());
+    }
+#endif
+
     if (limits.infinite) {
         std::unique_lock<std::mutex> lock(stop_mutex_);
         stop_condition_.wait(lock, [this] { return stop_flag_.load(); });
@@ -452,7 +641,23 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
     if (info.depth == 0) {
         EmitInfo(out, info, info.depth, info.nodes, elapsed_ms);
     }
-    EmitBestMove(out, info);
+
+    // Task 058: resign when the completed score is below the configured
+    // threshold, except for infinite analysis, user-cancelled searches, book
+    // moves (handled before the search) and terminal roots. The stop flag
+    // doubles as the cancel detector: only HandleStop and HandleQuit set it
+    // during a search, deadline abortions keep it false.
+    const bool resign = !limits.infinite && !stop_flag_.load() &&
+                        info.bestMove.has_value() &&
+                        ShouldResign(info, options_.resign_cp);
+    if (resign) {
+        const std::lock_guard<std::mutex> lock(output_mutex_);
+        out << "info string resign "
+            << ResignDiagnostic(info, options_.resign_cp) << '\n';
+        out.flush();
+    }
+    EmitBestMove(out, info, resign);
+    UciDebug("worker: bestmove emitted");
 
     searching_.store(false, std::memory_order_release);
 }
@@ -482,12 +687,14 @@ void UciEngine::EmitInfo(std::ostream& out, const SearchInfo& info, int depth,
     out.flush();
 }
 
-void UciEngine::EmitBestMove(std::ostream& out, const SearchInfo& info) {
+void UciEngine::EmitBestMove(std::ostream& out, const SearchInfo& info,
+                             bool resign) {
     const std::lock_guard<std::mutex> lock(output_mutex_);
-    if (info.bestMove.has_value()) {
+    if (info.bestMove.has_value() && !resign) {
         out << "bestmove " << info.bestMove->ToUci() << '\n';
     } else {
-        // No legal moves (should not happen in normal play).
+        // No legal moves, or task 058 resignation: `bestmove 0000` is the
+        // protocol's portable no-move signal.
         out << "bestmove 0000\n";
     }
     out.flush();

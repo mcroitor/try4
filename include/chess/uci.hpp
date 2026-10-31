@@ -22,12 +22,25 @@
 
 namespace chess {
 
+// Task 048: maximum worker count. Frozen at 1 without the SMP PoC.
+#ifdef TRY4_SMP_POC
+inline constexpr int kMaxUciThreads = 4;
+#else
+inline constexpr int kMaxUciThreads = 1;
+#endif
+
 // UCI option definitions for the engine.
 struct UciOptions {
     std::size_t hash_mb = 16;
     int move_overhead_ms = 20;
-    // Threads fixed at 1 for v1; field present for future compatibility.
+    // Task 048: 1 by default and always 1 unless TRY4_SMP_POC is on; the
+    // PoC accepts 1-4 through setoption and the [uci] section.
     int threads = 1;
+
+    // Task 058: resign threshold in centipawns, from the side to move's
+    // perspective. 0 or any positive value disables resignation. The effective
+    // range is -100000..0; a negative mate score resigns under the threshold.
+    int resign_cp = -600;
 
     // Opening book options.
     std::string book_path;        // Path to book file (.bin or .txt)
@@ -41,6 +54,15 @@ struct UciOptions {
 struct GoCommand {
     SearchLimits limits;
 };
+
+// Task 058: the score-side resignation gate. The caller must satisfy the
+// context exclusions (a completed search, not a cancelled or infinite search,
+// a searched move rather than a book move); this helper holds only the pure
+// score comparison with the disable-at-zero rule and the documented range.
+inline bool ShouldResign(const SearchInfo& info, int resign_cp) {
+    return resign_cp >= -100000 && resign_cp < 0 && info.depth > 0 &&
+           info.scoreCp < resign_cp;
+}
 
 // UCI engine adapter. Handles the UCI protocol handshake and command loop.
 // The engine runs on a background thread; commands are processed on the
@@ -86,7 +108,8 @@ private:
                       std::ostream& out);
     void EmitInfo(std::ostream& out, const SearchInfo& info, int depth,
                   std::uint64_t nodes, std::int64_t elapsed_ms);
-    void EmitBestMove(std::ostream& out, const SearchInfo& info);
+    void EmitBestMove(std::ostream& out, const SearchInfo& info,
+                      bool resign = false);
 
     // State.
     UciOptions options_;
