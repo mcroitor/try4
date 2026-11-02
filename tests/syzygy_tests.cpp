@@ -13,10 +13,21 @@
 namespace {
 
 std::string TablebasePath() {
+#ifdef _MSC_VER
+    char* env = nullptr;
+    std::size_t length = 0;
+    const auto result = _dupenv_s(&env, &length, "TRY4_SYZYGY_PATH");
+    const std::string path = result == 0 && env != nullptr ? env : "";
+    std::free(env);
+    if (!path.empty()) {
+        return path;
+    }
+#else
     if (const char* env = std::getenv("TRY4_SYZYGY_PATH");
         env != nullptr && *env != '\0') {
         return env;
     }
+#endif
 #ifdef _WIN32
     const std::string fallback = "c:\\games\\see\\Syzygy345";
     if (std::filesystem::exists(fallback)) {
