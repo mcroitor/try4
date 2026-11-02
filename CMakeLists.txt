@@ -191,6 +191,7 @@ if(TRY4_BUILD_TESTS)
     try4_add_test(try4_see tests/see_tests.cpp unit)
     try4_add_test(try4_search_pruning tests/search_pruning_tests.cpp search)
     try4_add_test(try4_tactical tests/tactical_tests.cpp tactical)
+    try4_add_test(try4_bitboard tests/bitboard_tests.cpp bitboard)
 
     find_package(Threads REQUIRED)
     try4_add_test(try4_search_time tests/search_time_tests.cpp search)
