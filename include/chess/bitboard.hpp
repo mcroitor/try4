@@ -34,6 +34,9 @@ constexpr Board Without(Board board, Square square) {
 }
 
 constexpr Board Move(Board board, Square from, Square to) {
+    if (!from.IsValid() || !to.IsValid()) {
+        return board;
+    }
     return With(Without(board, from), to);
 }
 
@@ -62,18 +65,26 @@ constexpr std::optional<Square> LowestSquare(Board board) {
     return std::nullopt;
 }
 
-// Removes the lowest set square from `board` and returns it, or nullopt when
-// `board` is empty.
-constexpr Square HighestSquare(Board board) {
+constexpr std::optional<Square> HighestSquare(Board board) {
     if (board == kEmptyBoard) {
-        return Square();
+        return std::nullopt;
     }
     for (int index = 63; index >= 0; --index) {
         if ((board >> index) & 1) {
             return Square(static_cast<std::uint8_t>(index));
         }
     }
-    return Square();
+    return std::nullopt;
+}
+
+// Removes the lowest set square from `board` and returns it, or nullopt when
+// `board` is empty.
+constexpr std::optional<Square> NextSquare(Board& board) {
+    const auto square = LowestSquare(board);
+    if (square) {
+        board &= board - 1;
+    }
+    return square;
 }
 
 }  // namespace bitboard
