@@ -1,7 +1,7 @@
 # Tests
 
-The suite has twenty-one Catch2 executables, one Python real-process suite,
-and one CMake smoke test registered with CTest (23 test targets):
+The suite has twenty-seven Catch2 executables, one Python real-process suite,
+and one CMake smoke test registered with CTest (29 test targets):
 
 | CTest test | Label | Coverage |
 |---|---|---|
@@ -24,19 +24,19 @@ and one CMake smoke test registered with CTest (23 test targets):
 | `try4_cli_tests` | `cli` | Scripted CLI sessions, moves, errors, perft, results |
 | `try4_uci_tests` | `uci` | Handshake, options, scripted position/search/stop sessions |
 | `try4_book_tests` | `book` | Polyglot reference hashes, special moves, text books, UCI selection/fallback |
+| `try4_syzygy` | `syzygy` | Optional Syzygy probing, DTZ/fifty-move, load fallback, piece limits, UCI option; skips without a local tablebase path |
 | `try4_release_smoke` | `release` | Executable versions agree with CMake and UCI identity |
 | `try4_config_tests` | `config` | Strict schema, defaults, parameter effects and TT policy changes |
 | `try4_forcing_tests` | `forcing` | Legal's mate beyond horizon, independent minimax oracle, limits and restoration |
 | `try4_engine_process` | `uci;config;forcing` | Natural completion, infinite/stop, real startup/discovery/config/override behavior |
 
-There are 160 Catch2 test cases in total: 15 type/move, 10 position, 10 attack,
-17 movegen, 14 legal, 6 result, 8 draw/hash, 6 notation, 10 evaluation, 6 FEN,
-2 fuzz, 4 perft, 1 property, 9 search, 7 TT/time, 1 tactical, 4 CLI,
-10 UCI, 9 book, 5 configuration, and 6 forcing cases. The separate CMake smoke
+The suite currently has 27 Catch2 executables. The separate CMake smoke
 test launches both apps; the Python suite has ten process-level cases, including
 quit-during-search, book-miss/tight-clock, and stop/restart/option stress.
 `scripts/uci_stability.py` is the separate long-running 1,000-game protocol
-harness; it is not part of CTest.
+harness; it is not part of CTest. `scripts/syzygy_crosscheck.py` is the separate
+optional oracle for the Syzygy root prober when python-chess and a local
+tablebase set are available.
 
 Run everything:
 
@@ -57,6 +57,7 @@ ctest --test-dir build/cmake -C Debug -L search --output-on-failure
 ctest --test-dir build/cmake -C Debug -L tactical --output-on-failure
 ctest --test-dir build/cmake -C Debug -L uci --output-on-failure
 ctest --test-dir build/cmake -C Debug -L book --output-on-failure
+ctest --test-dir build/cmake -C Debug -L syzygy --output-on-failure
 ctest --test-dir build/cmake -C Debug -L release --output-on-failure
 ctest --test-dir build/cmake -C Debug -L config --output-on-failure
 ctest --test-dir build/cmake -C Debug -L forcing --output-on-failure

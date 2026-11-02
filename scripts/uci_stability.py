@@ -112,7 +112,7 @@ class Engine:
         self.process.stdin.write(text + "\n")
         self.process.stdin.flush()
 
-    def wait_for(self, prefix, timeout, started=None):
+    def wait_for(self, prefix, timeout, started=None, lines=None):
         deadline = time.perf_counter() + timeout
         while True:
             remaining = deadline - time.perf_counter()
@@ -127,6 +127,8 @@ class Engine:
                 raise ProtocolError(f"engine exited ({code}) while waiting for {prefix}: "
                                     f"{self.stderr_text.strip()}")
             line, stamp = item
+            if lines is not None:
+                lines.append(line)
             if line.startswith(prefix):
                 return line, stamp
 
@@ -270,7 +272,7 @@ def movetext(san_moves):
 
 class Worker:
     def __init__(self, engine_path, cli_path, arguments, games, openings,
-                 options, failures, lock, stop_probe_every):
+                 options, failures, lock, stop_probe_every, syzygy_path):
         self.engine_path = engine_path
         self.cli_path = cli_path
         self.arguments = arguments
@@ -280,6 +282,7 @@ class Worker:
         self.failures = failures
         self.lock = lock
         self.stop_probe_every = stop_probe_every
+        self.syzygy_path = syzygy_path
         self.engines = [Engine(engine_path, arguments), Engine(engine_path, arguments)]
         self.judge = CliJudge(cli_path)
         self.version = None
@@ -295,8 +298,19 @@ class Worker:
             engine.drain()
             engine.send("setoption name OwnBook value false")
             engine.send("setoption name Threads value 1")
+            if self.syzygy_path:
+                engine.send(f"setoption name SyzygyPath value {self.syzygy_path}")
             engine.send("isready")
-            engine.wait_for("readyok", 5)
+            ready_start = time.perf_counter()
+            seen: list[str] = []
+            engine.wait_for("readyok", 5, lines=seen if self.syzygy_path else None)
+            self.ready_latencies.append((time.perf_counter() - ready_start) * 1000)
+            if self.syzygy_path and not any(
+                    line.startswith("info string Syzygy loaded:") for line in seen):
+                self.failures.add("syzygy_load_failed", {
+                    "expected_path": self.syzygy_path,
+                    "lines": seen,
+                })
         for engine in self.engines:
             engine.drain()
         version = subprocess.check_output([str(self.engine_path), "--version"],
@@ -315,8 +329,17 @@ class Worker:
         engine.drain()
         engine.send("setoption name OwnBook value false")
         engine.send("setoption name Threads value 1")
+        if self.syzygy_path:
+            engine.send(f"setoption name SyzygyPath value {self.syzygy_path}")
         engine.send("isready")
-        engine.wait_for("readyok", 5)
+        seen: list[str] = []
+        engine.wait_for("readyok", 5, lines=seen if self.syzygy_path else None)
+        if self.syzygy_path and not any(
+                line.startswith("info string Syzygy loaded:") for line in seen):
+            self.failures.add("syzygy_load_failed", {
+                "expected_path": self.syzygy_path,
+                "lines": seen,
+            })
         engine.drain()
 
     def play(self, game_id, opening, white_index):
@@ -564,6 +587,8 @@ def main():
                         help="record a per-move deadline violation above this")
     parser.add_argument("--stop-probe-every", type=int, default=25)
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--syzygy-path", default="",
+                        help="optional Syzygy directory for both engines")
     parser.add_argument("--hardware", default="unspecified")
     parser.add_argument("--label", default="stability")
     args = parser.parse_args()
@@ -593,7 +618,8 @@ def main():
     failures = FailureCounter(lock)
     common = dict(engine_path=engine, cli_path=cli, arguments=(),
                   openings=openings, options=args, failures=failures, lock=lock,
-                  stop_probe_every=max(1, args.stop_probe_every))
+                  stop_probe_every=max(1, args.stop_probe_every),
+                  syzygy_path=args.syzygy_path)
     workers = [Worker(games=assignment, **common) for assignment in assignments]
 
     started = time.perf_counter()
@@ -645,6 +671,7 @@ def main():
             "seed": args.seed,
             "opening_file": str(args.openings.resolve()),
             "opening_sha256": hashlib.sha256(args.openings.read_bytes()).hexdigest(),
+            "syzygy_path": args.syzygy_path or None,
             "move_deadline_violation_ms": args.forfeit_ms,
             "note": "Fixed clock control; identical engines. Stability only, not strength.",
         },

@@ -72,66 +72,66 @@ They are not calendar commitments.
 
 ## Index
 
-|   ID | Title                                                                      | Stage | Depends on    | Estimate |
-| ---: | -------------------------------------------------------------------------- | ----: | ------------- | -------- |
-|  001 | Initialize git and establish repository hygiene                            |     0 | —             | 0.5 day  |
-|  002 | Add a canonical CMake build with C++17 and warning flags                   |     0 | 001           | 1 day    |
-|  003 | Add Catch2/CTest and characterization tests, then wire CI                  |     0 | 002           | 1.5 days |
-|  004 | Fix compiler warnings and header hygiene                                   |     0 | 002, 003      | 0.5 day  |
-|  005 | Write the README and developer documentation                               |     0 | 002, 003      | 0.5 day  |
-|  006 | Introduce the chess namespace, core enums, Piece, and Square               |     1 | 003, 004      | 1.5 days |
-|  007 | Implement the Move type with explicit flags and promotion                  |     1 | 006           | 1 day    |
-|  008 | Implement Position state and standard setup                                |     1 | 006, 007      | 1.5 days |
-|  009 | Implement strict FEN parsing, serialization, and validation                |     1 | 008           | 1.5 days |
-|  010 | Harden the core and FEN regression suite                                   |     1 | 009           | 1 day    |
-|  011 | Migrate to a 0x88 board and implement attack detection                     |     2 | 008           | 2 days   |
-|  012 | Generate pseudo-legal pawn, knight, and king moves                         |     2 | 011           | 2 days   |
-|  013 | Generate pseudo-legal sliding-piece moves                                  |     2 | 011           | 1.5 days |
-|  014 | Add castling, en passant, and special-move integration                     |     2 | 012, 013      | 2 days   |
-|  015 | Implement make/unmake history and legal move filtering                     |     2 | 014           | 2.5 days |
-|  016 | Implement checkmate, stalemate, and game result detection                  |     2 | 015           | 1 day    |
-|  017 | Add the perft harness and reference regression suite                       |     2 | 015, 016      | 1.5 days |
-|  018 | Add make/unmake invariant and random-playout tests                         |     2 | 017           | 1 day    |
-|  019 | Implement Zobrist hashing and draw detection                               |     3 | 015, 016      | 2 days   |
-|  020 | Implement SAN/UCI notation and an interactive CLI; retire the legacy core  |     3 | 016, 019      | 2 days   |
-|  021 | Expand fuzzing and add sanitizer CI                                        |     3 | 018, 020      | 1.5 days |
-|  022 | Implement the search contract, negamax alpha-beta, and iterative deepening |     4 | 016, 019      | 2 days   |
-|  023 | Add quiescence search and move ordering                                    |     4 | 022           | 1.5 days |
-|  024 | Implement the transposition table and time management                      |     4 | 022, 023      | 2 days   |
-|  025 | Create the tactical suite and deterministic search regression tests        |     4 | 024           | 1.5 days |
-|  026 | Implement material, piece-square, and tapered evaluation                   |     5 | 022           | 1.5 days |
-|  027 | Add positional evaluation terms                                            |     5 | 026           | 1.5 days |
-|  028 | Build the self-play/SPRT harness and establish an evaluation baseline      |     5 | 023, 024, 027 | 2 days   |
-|  029 | Implement the UCI adapter skeleton and handshake                           |     6 | 024, 025      | 1 day    |
-|  030 | Implement UCI position/go/stop/quit with asynchronous search               |     6 | 029           | 2 days   |
-|  031 | Add UCI options, detailed info output, and conformance tests               |     6 | 030           | 1.5 days |
-|  032 | Validate GUI play and 1,000-game stability; write UCI usage docs           |     6 | 031, 028      | 1.5 days |
-|  033 | Migrate move generation to bitboards behind the public API                 |     7 | 032           | 3 days   |
-|  034 | Add advanced search pruning with measured SPRT gains                       |     7 | 032           | 2 days   |
-|  035 | Add optional opening book, Syzygy tablebases, and Lazy SMP                 |     7 | 034           | 2 days   |
-|  036 | Add versioning, changelog, and license metadata                            |     8 | 032           | 0.5 day  |
-|  037 | Add packaging and release binaries                                         |     8 | 036           | 1 day    |
-|  038 | Run the final regression matrix, tag the release, and write release notes  |     8 | 037           | 1 day    |
-|  039 | Close UCI conformance gaps before release                                   |     8 | 031           | TBD      |
-|  040 | Agree configuration and forcing-search behavior                            | Enhancement | Existing engine | 0.5 day |
-|  041 | Parameterize evaluation with immutable settings                            | Enhancement | 040           | 1.5–2 days |
-|  042 | Implement configuration schema and strict file parser                      | Enhancement | 040, 041      | 1–1.5 days |
-|  043 | Apply startup configuration and UCI overrides                               | Enhancement | 039, 041, 042 | 1–1.5 days |
-|  044 | Search bounded forcing continuations including quiet checks                | Enhancement | 040           | 2–3 days |
-|  045 | Connect forcing controls to configuration and UCI search                    | Enhancement | 043, 044      | 0.5–1 day |
-|  046 | Validate configurable evaluation and forcing search                         | Enhancement | 041–045       | 1–2 days + matches |
-|  047 | Complete independent release verification                                  | Post-release | 037, 038      | 0.5–1 day + CI |
-|  048 | Prototype Lazy SMP and decide whether parallel search is viable             | Post-release | 038, 039      | 4–6 days + runtime |
-|  049 | Record the search baseline and add a repeatable benchmark harness          | Performance  | 048           | 0.5 day  |
-|  050 | Add allocation-free move generation and unchecked make/unmake to Position  | Performance  | 049           | 1 day    |
-|  051 | Restructure the search hot path: one generation per node, fixed PV, no heap | Performance  | 050           | 1.5 days |
-|  052 | Replace the full sort with a score-once staged move picker                 | Performance  | 051           | 0.5 day  |
-|  053 | Improve transposition-table reuse without changing fixed-depth results     | Performance  | 051           | 0.5 day  |
-|  054 | Cut evaluation cost while keeping scores byte-identical                    | Performance  | 051           | 0.5–1 day |
-|  055 | Add principal-variation search and aspiration windows                      | Strength     | 052, 053      | 1 day    |
-|  056 | Add guarded null-move, LMR, check extensions and delta pruning              | Strength     | 055           | 1.5–2 days |
-|  057 | Harden the 60-move clock budget and validate the depth work in a TSCP match | Strength     | 049–056       | 1 day + match |
-|  058 | Add a configurable resignation threshold                                   | Post-release | 039, 043      | 0.5–1 day |
+|   ID | Title                                                                       |        Stage | Depends on      | Estimate           |
+| ---: | --------------------------------------------------------------------------- | -----------: | --------------- | ------------------ |
+|  001 | Initialize git and establish repository hygiene                             |            0 | —               | 0.5 day            |
+|  002 | Add a canonical CMake build with C++17 and warning flags                    |            0 | 001             | 1 day              |
+|  003 | Add Catch2/CTest and characterization tests, then wire CI                   |            0 | 002             | 1.5 days           |
+|  004 | Fix compiler warnings and header hygiene                                    |            0 | 002, 003        | 0.5 day            |
+|  005 | Write the README and developer documentation                                |            0 | 002, 003        | 0.5 day            |
+|  006 | Introduce the chess namespace, core enums, Piece, and Square                |            1 | 003, 004        | 1.5 days           |
+|  007 | Implement the Move type with explicit flags and promotion                   |            1 | 006             | 1 day              |
+|  008 | Implement Position state and standard setup                                 |            1 | 006, 007        | 1.5 days           |
+|  009 | Implement strict FEN parsing, serialization, and validation                 |            1 | 008             | 1.5 days           |
+|  010 | Harden the core and FEN regression suite                                    |            1 | 009             | 1 day              |
+|  011 | Migrate to a 0x88 board and implement attack detection                      |            2 | 008             | 2 days             |
+|  012 | Generate pseudo-legal pawn, knight, and king moves                          |            2 | 011             | 2 days             |
+|  013 | Generate pseudo-legal sliding-piece moves                                   |            2 | 011             | 1.5 days           |
+|  014 | Add castling, en passant, and special-move integration                      |            2 | 012, 013        | 2 days             |
+|  015 | Implement make/unmake history and legal move filtering                      |            2 | 014             | 2.5 days           |
+|  016 | Implement checkmate, stalemate, and game result detection                   |            2 | 015             | 1 day              |
+|  017 | Add the perft harness and reference regression suite                        |            2 | 015, 016        | 1.5 days           |
+|  018 | Add make/unmake invariant and random-playout tests                          |            2 | 017             | 1 day              |
+|  019 | Implement Zobrist hashing and draw detection                                |            3 | 015, 016        | 2 days             |
+|  020 | Implement SAN/UCI notation and an interactive CLI; retire the legacy core   |            3 | 016, 019        | 2 days             |
+|  021 | Expand fuzzing and add sanitizer CI                                         |            3 | 018, 020        | 1.5 days           |
+|  022 | Implement the search contract, negamax alpha-beta, and iterative deepening  |            4 | 016, 019        | 2 days             |
+|  023 | Add quiescence search and move ordering                                     |            4 | 022             | 1.5 days           |
+|  024 | Implement the transposition table and time management                       |            4 | 022, 023        | 2 days             |
+|  025 | Create the tactical suite and deterministic search regression tests         |            4 | 024             | 1.5 days           |
+|  026 | Implement material, piece-square, and tapered evaluation                    |            5 | 022             | 1.5 days           |
+|  027 | Add positional evaluation terms                                             |            5 | 026             | 1.5 days           |
+|  028 | Build the self-play/SPRT harness and establish an evaluation baseline       |            5 | 023, 024, 027   | 2 days             |
+|  029 | Implement the UCI adapter skeleton and handshake                            |            6 | 024, 025        | 1 day              |
+|  030 | Implement UCI position/go/stop/quit with asynchronous search                |            6 | 029             | 2 days             |
+|  031 | Add UCI options, detailed info output, and conformance tests                |            6 | 030             | 1.5 days           |
+|  032 | Validate GUI play and 1,000-game stability; write UCI usage docs            |            6 | 031, 028        | 1.5 days           |
+|  033 | Migrate move generation to bitboards behind the public API                  |            7 | 032             | 3 days             |
+|  034 | Add advanced search pruning with measured SPRT gains                        |            7 | 032             | 2 days             |
+|  035 | Add optional opening book, Syzygy tablebases, and Lazy SMP                  |            7 | 034             | 2 days             |
+|  036 | Add versioning, changelog, and license metadata                             |            8 | 032             | 0.5 day            |
+|  037 | Add packaging and release binaries                                          |            8 | 036             | 1 day              |
+|  038 | Run the final regression matrix, tag the release, and write release notes   |            8 | 037             | 1 day              |
+|  039 | Close UCI conformance gaps before release                                   |            8 | 031             | TBD                |
+|  040 | Agree configuration and forcing-search behavior                             |  Enhancement | Existing engine | 0.5 day            |
+|  041 | Parameterize evaluation with immutable settings                             |  Enhancement | 040             | 1.5–2 days         |
+|  042 | Implement configuration schema and strict file parser                       |  Enhancement | 040, 041        | 1–1.5 days         |
+|  043 | Apply startup configuration and UCI overrides                               |  Enhancement | 039, 041, 042   | 1–1.5 days         |
+|  044 | Search bounded forcing continuations including quiet checks                 |  Enhancement | 040             | 2–3 days           |
+|  045 | Connect forcing controls to configuration and UCI search                    |  Enhancement | 043, 044        | 0.5–1 day          |
+|  046 | Validate configurable evaluation and forcing search                         |  Enhancement | 041–045         | 1–2 days + matches |
+|  047 | Complete independent release verification                                   | Post-release | 037, 038        | 0.5–1 day + CI     |
+|  048 | Prototype Lazy SMP and decide whether parallel search is viable             | Post-release | 038, 039        | 4–6 days + runtime |
+|  049 | Record the search baseline and add a repeatable benchmark harness           |  Performance | 048             | 0.5 day            |
+|  050 | Add allocation-free move generation and unchecked make/unmake to Position   |  Performance | 049             | 1 day              |
+|  051 | Restructure the search hot path: one generation per node, fixed PV, no heap |  Performance | 050             | 1.5 days           |
+|  052 | Replace the full sort with a score-once staged move picker                  |  Performance | 051             | 0.5 day            |
+|  053 | Improve transposition-table reuse without changing fixed-depth results      |  Performance | 051             | 0.5 day            |
+|  054 | Cut evaluation cost while keeping scores byte-identical                     |  Performance | 051             | 0.5–1 day          |
+|  055 | Add principal-variation search and aspiration windows                       |     Strength | 052, 053        | 1 day              |
+|  056 | Add guarded null-move, LMR, check extensions and delta pruning              |     Strength | 055             | 1.5–2 days         |
+|  057 | Harden the 60-move clock budget and validate the depth work in a TSCP match |     Strength | 049–056         | 1 day + match      |
+|  058 | Add a configurable resignation threshold                                    | Post-release | 039, 043        | 0.5–1 day          |
 
 ### Configuration and forcing-search increment (2026-10-26)
 
@@ -203,11 +203,11 @@ Dependency order:
 
 Gates:
 
-| Gate | After | Requirement |
-|---|---|---|
-| S1 | 051 | Golden corpus identical; >= 3x NPS over 049; depth >= 6 at 2 s |
-| S2 | 056 | +2 plies at 2 s on >= 4 of 6 benchmark positions; tactical suite 100%; flags-off exactness intact |
-| S3 | 057 | 200-game match vs TSCP at 60/120 with a non-negative score, zero forfeits and zero illegal moves |
+| Gate | After | Requirement                                                                                       |
+| ---- | ----- | ------------------------------------------------------------------------------------------------- |
+| S1   | 051   | Golden corpus identical; >= 3x NPS over 049; depth >= 6 at 2 s                                    |
+| S2   | 056   | +2 plies at 2 s on >= 4 of 6 benchmark positions; tactical suite 100%; flags-off exactness intact |
+| S3   | 057   | 200-game match vs TSCP at 60/120 with a non-negative score, zero forfeits and zero illegal moves  |
 
 The 049 baseline already reaches depth 6 at 2 s on the start position, so S1's
 discriminating target is the 3x NPS requirement (about 350k NPS at 2 s on the

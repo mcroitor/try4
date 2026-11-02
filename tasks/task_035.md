@@ -17,20 +17,21 @@
   "fails gracefully when data is missing" contract.
 - **Lazy SMP:** superseded by task 048's PoC (`build/smp-on`); the
   go/no-go and the follow-up live in `docs/SMP_POC.md`.
-- **Syzygy tablebases: assets available, probing not yet implemented.** A
-  (partial) 3-4-5 tablebase set was verified on this machine in October 2026:
-  `c:\games\see\Syzygy345\` holds 145 `.rtbw` + 145 `.rtbz` files (~938 MB);
-  spot-checked heads are the genuine Syzygy2 magics
-  (`71 E8 23 5D` WDL, `D7 66 0C A5` DTZ). The 2026 blocker is therefore not
-  assets but implementation effort with verification: the block/Huffman
-  format is intricate enough that a from-memory implementation without the
-  README spec at hand is likely to produce a confidently-wrong prober (worse
-  than none). Smallest unblock action for a dedicated session: implement
-  WDL+DTZ probing against the 3-piece tables first, verify a few hundred
-  random KxKy/KyP positions against the engine's own deep search, then
-  widen to 4-5 and integrate behind `[uci] syzygy_path` with the
-  fifty-move/DTZ contract of this task's requirement 3. Probing, licensing
-  and layout documentation follow that work.
+- **Syzygy tablebases: implemented behind `SyzygyPath` /
+  `[uci] syzygy_path`.** The engine vendors the MIT-licensed Fathom prober
+  under `src/third_party/fathom/`. Root probes use WDL+DTZ with the position's
+  halfmove clock and the fifty-move rule. Interior search uses raw WDL only on a
+  zero halfmove clock, and positions with castling rights, beyond the loaded
+  piece limit, or missing material files fall back to search. Setup, limits,
+  data layout and licensing are documented in `docs/SYZYGY.md`, `docs/UCI.md`
+  and `THIRD_PARTY_NOTICES.md`. The local 3-4-5 set
+  (`c:\games\see\Syzygy345\`, 145 `.rtbw` + 145 `.rtbz`) verified:
+  200 random KQvK/KRvK/KPvK root probes agree with python-chess with zero
+  mismatches, and 60 decisive KQvK/KRvK positions agree with a depth-8 search
+  on WDL sign. A 1,000-game protocol stability run with the same tablebase
+  directory is archived in `docs/stability/syzygy-1000/` with 1000/1000 games
+  completed, no illegal moves, crashes or time forfeits; `resignation`
+  terminations are the task-058 resignation path, not protocol failures.
 
 ## Objective
 
@@ -75,10 +76,10 @@ SMP multithreading. Do not enable any by default in v1.
 
 ## Acceptance criteria
 
-- [ ] Default build behavior is unchanged.
-- [ ] Each optional feature works when enabled and fails gracefully when its data is missing.
-- [ ] No correctness or stability regression.
-- [ ] Documentation covers setup and limitations.
+- [x] Default build behavior is unchanged.
+- [x] Each optional feature works when enabled and fails gracefully when its data is missing.
+- [x] No correctness or stability regression.
+- [x] Documentation covers setup and limitations.
 
 ## Validation
 
@@ -90,6 +91,19 @@ ctest --test-dir build/cmake -C Release --output-on-failure
 
 Expected: default build/tests pass; optional features pass their smoke
 tests when enabled.
+
+## Evidence snapshot
+
+- `ctest --test-dir build/performance -C Release --output-on-failure`
+  with `TRY4_SYZYGY_PATH=c:\games\see\Syzygy345` passes 29/29 targets.
+- `python scripts/syzygy_crosscheck.py --engine build/performance/try4_uci.exe
+  --syzygy c:\games\see\Syzygy345 --positions 200 --deep-check 60
+  --output build/syzygy-crosscheck.json` reports 0 root-probe mismatches and
+  0 deep-check sign mismatches.
+- `docs/stability/syzygy-1000/summary.txt` records the archived
+  1,000-game protocol run with Syzygy enabled; `README.md` in that directory
+  explains how the 667 `resignation` terminations were produced and why they are
+  not protocol failures.
 
 ## Constraints and failure modes
 

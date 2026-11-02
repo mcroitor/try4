@@ -20,6 +20,19 @@ endif()
 
 configure_file(cmake/version.hpp.in generated/chess/version.hpp @ONLY)
 
+# Task 035: Fathom is vendored as source and compiled as C++ so the Windows
+# build uses std::atomic/mutex instead of a C11 atomics dependency. It is
+# third-party code: keep project warning flags off this target.
+set_source_files_properties(
+    src/third_party/fathom/tbprobe.c
+    PROPERTIES LANGUAGE CXX
+)
+add_library(try4_fathom STATIC src/third_party/fathom/tbprobe.c)
+target_include_directories(try4_fathom PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/fathom"
+)
+target_compile_definitions(try4_fathom PUBLIC TB_NO_HELPER_API)
+
 add_library(try4_core STATIC
     src/core/types.cpp
     src/core/position.cpp
@@ -34,6 +47,7 @@ add_library(try4_core STATIC
     src/core/transposition_table.cpp
     src/core/time_manager.cpp
     src/core/opening_book.cpp
+    src/core/syzygy.cpp
     src/core/configuration.cpp
     src/uci/uci.cpp
 )
@@ -46,7 +60,7 @@ if(TRY4_SMP_POC)
     target_compile_definitions(try4_core PUBLIC TRY4_SMP_POC)
 endif()
 find_package(Threads REQUIRED)
-target_link_libraries(try4_core PUBLIC Threads::Threads)
+target_link_libraries(try4_core PUBLIC Threads::Threads try4_fathom)
 
 function(try4_enable_warnings target)
     if(MSVC)
@@ -106,8 +120,10 @@ install(TARGETS try4 try4_uci RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES README.md CHANGELOG.md LICENSE CONTRIBUTING.md THIRD_PARTY_NOTICES.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES docs/UCI.md docs/RELEASE.md docs/RELEASE_NOTES.md
-        docs/CONFIGURATION.md docs/FORCING_SEARCH.md
+        docs/CONFIGURATION.md docs/FORCING_SEARCH.md docs/SYZYGY.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
+install(FILES src/third_party/fathom/LICENSE
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
 install(FILES config/try4.ini DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
 
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" TRY4_PACKAGE_OS)
@@ -182,6 +198,7 @@ if(TRY4_BUILD_TESTS)
 
     try4_add_test(try4_uci_tests tests/uci_tests.cpp uci)
     try4_add_test(try4_book_tests tests/opening_book_tests.cpp book)
+    try4_add_test(try4_syzygy tests/syzygy_tests.cpp syzygy)
     try4_add_test(try4_config_tests tests/configuration_tests.cpp config)
     try4_add_test(try4_forcing_tests tests/forcing_tests.cpp forcing)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)

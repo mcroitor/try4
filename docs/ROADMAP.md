@@ -421,8 +421,8 @@ Start only if profiling shows a real bottleneck or a strength target requires it
   - aspiration windows;
   - futility pruning;
   - static exchange evaluation (SEE).
-- [ ] Add opening book support (Polyglot) if desired.
-- [ ] Add Syzygy tablebase probing if desired.
+- [x] Add opening book support (Polyglot) if desired.
+- [x] Add Syzygy tablebase probing if desired.
 - [ ] Consider Lazy SMP multithreading only after single-thread stability.
 - [ ] Maintain SPRT regression testing for every strength change.
 - [ ] Record NPS and Elo deltas for each change.
