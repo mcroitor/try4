@@ -113,7 +113,7 @@ and archives JSON, CSV, PGN and a text summary. It counts illegal moves, crashes
 hangs, deadline violations and clock forfeits; any failure makes it exit nonzero.
 
 ```sh
-python scripts/uci_stability.py --engine build/feature-check/try4_uci.exe \
+python scripts/uci_stability.py --engine build/feature-check/try4.exe \
   --games 1000 --workers 4 --output build/feature-validation/stability-1000
 ```
 

@@ -8,7 +8,7 @@ hangs, duplicate bestmove lines, illegal moves and real stop latency
 only; the full legal-move judge lives in scripts/uci_stability.py.
 
 Usage:
-    python scripts/smp_stress.py --engine build/smp-on/try4_uci.exe \
+    python scripts/smp_stress.py --engine build/smp-on/try4.exe \
         --cycles 1000 --threads 4 --output build/smp-stress-4.json
 """
 import argparse

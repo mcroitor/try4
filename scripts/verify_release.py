@@ -36,12 +36,12 @@ def main():
         with zipfile.ZipFile(archive) as package:
             package.extractall(root)
         suffix = ".exe" if os.name == "nt" else ""
-        engines = list(root.rglob("try4_uci" + suffix))
+        engines = [path for path in root.rglob("try4" + suffix) if path.is_file()]
         if len(engines) != 1:
             raise RuntimeError("Package must contain exactly one UCI engine")
         engine = engines[0]
         # ZIP's Unix mode bits need explicit restoration with Python zipfile.
-        for exe in (engine, engine.with_name("try4" + suffix)):
+        for exe in (engine, engine.with_name("try4_cli" + suffix)):
             exe.chmod(0o755)
         env = os.environ.copy()
         # Exclude compiler/MinGW directories to catch accidental DLL dependencies.
@@ -54,7 +54,7 @@ def main():
                 capture_output=True, check=True, timeout=15, cwd=root, env=env
             ).stdout
 
-        for exe in (engine, engine.with_name("try4" + suffix)):
+        for exe in (engine, engine.with_name("try4_cli" + suffix)):
             if run(exe, "--version").strip() != f"try4 {version}":
                 raise RuntimeError(f"Version mismatch: {exe}")
         output = run(engine, input_text="uci\nisready\nposition startpos\ngo depth 1\nstop\nquit\n")

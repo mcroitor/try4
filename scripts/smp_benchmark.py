@@ -8,7 +8,7 @@ At each configured thread count:
 medians over the configured repeats. Standard library only.
 
 Usage:
-    python scripts/smp_benchmark.py --engine build/smp-on/try4_uci.exe \
+    python scripts/smp_benchmark.py --engine build/smp-on/try4.exe \
         --threads 1,2,4 --depth 6 --output build/smp-bench.json
 """
 import argparse

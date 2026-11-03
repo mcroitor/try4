@@ -38,7 +38,7 @@ This is a 4th iteration of the my chess engine development efforts. At the momen
   self-play, color swapping, PGN/CSV logs, Elo margins, and a recorded opening
   set.
 
-The `try4_uci` executable provides the UCI protocol and optional Polyglot or
+The `try4` executable provides the UCI protocol and optional Polyglot or
 tournament-text opening books. Automated evaluation-weight tuning is not
 implemented yet. The project owner reports stable CuteChess play; the archived
 1,000-game protocol run and final regression matrix are documented in
@@ -84,10 +84,10 @@ Run the interactive CLI:
 
 ```sh
 # Linux/macOS
-./build/cmake/try4
+./build/cmake/try4_cli
 
 # Windows (Ninja/MinGW)
-build\cmake\try4.exe
+build\cmake\try4_cli.exe
 ```
 
 The CLI starts from the normal initial position. Commands are `startpos`,
@@ -124,11 +124,11 @@ reproduction command.
 
 ## Run in CuteChess
 
-Select `build/release/try4_uci.exe` (Windows) or `build/release/try4_uci`
-(Linux) as a UCI engine. `try4` is the separate debugging CLI.
+Select `build/release/try4.exe` (Windows) or `build/release/try4`
+(Linux) as a UCI engine. `try4_cli` is the separate debugging CLI.
 
 ```sh
-build/release/try4_uci --version
+build/release/try4 --version
 ```
 
 Both the command above and UCI `id name` report `try4 0.1.1`. See
@@ -150,7 +150,7 @@ gates, see [`docs/RELEASE.md`](docs/RELEASE.md).
 ## Engine configuration and forcing search
 
 ```sh
-build/release/try4_uci --config config/try4.ini
+build/release/try4 --config config/try4.ini
 ```
 
 Without `--config`, optional `try4.ini` beside the executable supplies startup
@@ -165,8 +165,8 @@ remain built in; this feature adds horizon search, not main-search extensions.
 
 ## UCI opening books
 
-Build `try4_uci` with the CMake commands above, then add
-`build/release/try4_uci.exe` (or the Debug executable) as a UCI engine in
+Build `try4` with the CMake commands above, then add
+`build/release/try4.exe` (or the Debug executable) as a UCI engine in
 CuteChess. In the engine's settings, configure:
 
 | Option | Default | Meaning |
