@@ -173,6 +173,7 @@ CuteChess. In the engine's settings, configure:
 | `OwnBook` | `true` | Use the selected opening book. |
 | `BookFile` | empty | Path to a Polyglot `.bin` or tournament `.txt` book. |
 | `BookMaxPly` | `40` | Stop using the book after this many half-moves; `0` means unlimited. |
+| `SyzygyPath` | `<empty>` | Optional directory list with external `.rtbw`/`.rtbz` files; empty disables probing. |
 
 No book is loaded until `BookFile` is set. Prefer an absolute path in CuteChess,
 since relative paths are resolved against the engine process's working directory.
@@ -214,6 +215,12 @@ candidate against legal moves. Transpositions are matched by position, independe
 of move clocks. Loading an invalid file reports `info string Book load failed: ...`
 and clears the previous book so the engine continues with normal search. Empty
 books and malformed text lines are rejected. Set `BookFile` to `<empty>` to unload.
+
+Syzygy tablebase probing is off until `SyzygyPath` names a directory containing
+`.rtbw`/`.rtbz` files. Root probing uses WDL+DTZ and the fifty-move clock;
+missing data or unsupported material falls back to search. Tablebase data is
+not bundled. See [`docs/SYZYGY.md`](docs/SYZYGY.md) for setup, limits and
+licensing.
 
 ## Test
 
@@ -296,4 +303,5 @@ of done and stage gates.
 
 Project code is licensed under the [MIT license](LICENSE), selected by the
 project owner. See [third-party notices](THIRD_PARTY_NOTICES.md) for format
-constants, test dependencies, and externally supplied opening data.
+constants, the Fathom probing library, test dependencies, and externally
+supplied opening/tablebase data.

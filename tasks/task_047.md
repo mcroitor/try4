@@ -1,13 +1,13 @@
 # Task 047 — Complete independent release verification
 
-| Field | Value |
-|---|---|
-| ID | 047 |
-| Stage | Post-release verification |
-| Depends on | 037, 038 |
-| Estimate | 0.5–1 day plus CI runtime |
-| Priority | P2 |
-| Status | Ready |
+| Field      | Value                     |
+| ---------- | ------------------------- |
+| ID         | 047                       |
+| Stage      | Post-release verification |
+| Depends on | 037, 038                  |
+| Estimate   | 0.5–1 day plus CI runtime |
+| Priority   | P2                        |
+| Status     | Ready                     |
 
 ## Objective
 

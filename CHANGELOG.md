@@ -7,6 +7,11 @@ only when its tag and release report exist.
 
 ### Added
 
+- Task 035: optional Syzygy WDL+DTZ probing via `SyzygyPath` /
+  `[uci] syzygy_path`, using the vendored MIT-licensed Fathom library. Root
+  probing respects the fifty-move clock; interior WDL probing is gated on a
+  zero halfmove clock. Missing data falls back to search, and no tablebase
+  data is bundled. See `docs/SYZYGY.md`.
 - Task 058: configurable resignation. `[search] resign_cp` (default -600, 0
   disables) and the UCI `Resign` spin option; a completed search below the
   threshold emits `info string resign ...` followed by `bestmove 0000`.

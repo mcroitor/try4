@@ -14,6 +14,8 @@
 
 namespace chess {
 
+class SyzygyTablebase;
+
 // Mate scores are centipawn-like integers with a safe distance from ordinary
 // evaluation scores. A mate at ply p is encoded as kMateScore - p; a score
 // whose magnitude is at least kMateThreshold is a mate score.
@@ -164,6 +166,12 @@ struct SearchLimits {
     // when switching modes.
     EvaluationMode evaluationMode = EvaluationMode::Full;
 
+    // Task 035: optional external tablebase. The Searcher never owns it; the
+    // caller keeps it alive for the whole search. Null keeps the default
+    // data-free behavior. A root probe uses WDL+DTZ and the fifty-move clock;
+    // interior probes use raw WDL only when the halfmove clock is zero.
+    const SyzygyTablebase* tablebase = nullptr;
+
     std::optional<std::uint64_t> EffectiveNodeLimit() const {
         return nodeLimit.has_value() ? nodeLimit : nodes;
     }
@@ -187,6 +195,13 @@ struct SearchInfo {
     // The first PV move, or nullopt when the root has no legal move or the
     // position is already terminal.
     std::optional<Move> bestMove;
+
+    // Task 035: true when the result came from a root tablebase probe. The
+    // WDL/DTZ values are diagnostic only; the score already accounts for the
+    // fifty-move rule.
+    bool tablebase = false;
+    int tablebaseWdl = 0;
+    int tablebaseDtz = 0;
 };
 
 // Optional progress observer. It is called on the searching thread after each

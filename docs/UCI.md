@@ -11,6 +11,9 @@ must not be selected as the engine in CuteChess.
    `binc`, `movestogo` (times in milliseconds).
 4. For a book, set `BookFile` to an absolute `.bin` or `.txt` path. Books
    are not included in the runtime ZIP.
+5. For endgame tablebases, set `SyzygyPath` to a directory containing
+   `.rtbw`/`.rtbz` files. Tablebase data is not included in the runtime ZIP;
+   see [SYZYGY.md](SYZYGY.md).
 
 The project owner reports successful and stable play in CuteChess. The archived
 release evidence is a 1,000-game protocol-level run using two real UCI processes
@@ -30,6 +33,7 @@ this does not claim GUI-specific latency or universal GUI compatibility.
 | OwnBook | true | Book use requires a selected BookFile. |
 | BookFile | empty | Polyglot `.bin` or `<id><TAB><UCI moves>` `.txt`. |
 | BookMaxPly | 40 | Half-move cutoff; 0 means unlimited. |
+| SyzygyPath | <empty> | Directory list with `.rtbw`/`.rtbz` files; empty disables probing. |
 
 Startup values can be supplied by `--config PATH` or optional executable-adjacent
 `try4.ini`. UCI declarations reflect those values; later GUI overrides win and
@@ -39,6 +43,24 @@ weights and [FORCING_SEARCH.md](FORCING_SEARCH.md) for tactical-horizon controls
 Paths with spaces are accepted as an unquoted UCI option value. Opening-book
 selection is weighted random. A miss or disabled book falls back to search;
 infinite/ponder commands bypass the book.
+
+## Syzygy tablebases
+
+`SyzygyPath` enables optional WDL+DTZ probing. At a covered root the engine
+reports a tablebase result immediately (the search worker still holds a
+`go infinite` result until `stop`), for example:
+
+```text
+info string Syzygy WDL win DTZ 13
+info depth 0 score cp 95000 nodes 0 nps 0 time 2 pv h1b7
+bestmove h1b7
+```
+
+The root probe applies the halfmove clock and fifty-move rule. Interior search
+uses raw WDL only at halfmove clock zero. Positions with castling rights, too
+many pieces, or missing material files fall back to search. A missing directory
+produces `info string Syzygy load failed: ...` and never prevents the engine
+from searching. See [SYZYGY.md](SYZYGY.md) for setup, data layout and licensing.
 
 ## Protocol example
 

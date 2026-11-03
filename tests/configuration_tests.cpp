@@ -20,6 +20,7 @@ TEST_CASE("Configuration example and normalized snapshot preserve defaults", "[c
 
 TEST_CASE("Configuration parses BOM CRLF paths and parameter arrays", "[config]") {
     std::istringstream stream("\xef\xbb\xbf# comment\r\n[uci]\r\nbook_file=C:\\book #1;test=a.bin\r\n"
+        "syzygy_path=C:\\tables 3-4-5\r\n"
         "hash_mb=32\n[evaluation]\nmaterial_mg=0,100,350,330,500,900,0\n"
         "pst_eg_percent=80\n[search]\nforcing_checks=true\n");
     std::string error;
@@ -27,6 +28,7 @@ TEST_CASE("Configuration parses BOM CRLF paths and parameter arrays", "[config]"
     INFO(error);
     REQUIRE(options);
     REQUIRE(options->book_path == "C:\\book #1;test=a.bin");
+    REQUIRE(options->syzygy_path == "C:\\tables 3-4-5");
     REQUIRE(options->hash_mb == 32);
     REQUIRE(options->evaluation.material_mg[2] == 350);
     REQUIRE(options->evaluation[chess::EvalWeight::PstEgPercent] == 80);
@@ -186,6 +188,22 @@ TEST_CASE("Search parses resign threshold and records it in the snapshot", "[con
     CHECK(chess::ShouldResign(default_info, -600) == false);   // positive mate
     default_info.scoreCp = -(chess::kMateScore - 1);
     CHECK(chess::ShouldResign(default_info, -600) == true);    // negative mate
+}
+
+TEST_CASE("Configuration parses and snapshots syzygy_path", "[config][syzygy]") {
+    std::istringstream input(
+        "[uci]\nsyzygy_path=C:\\games\\see\\Syzygy345\n");
+    std::string error;
+    const auto parsed = chess::ParseConfiguration(input, "test.ini", &error);
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->syzygy_path == "C:\\games\\see\\Syzygy345");
+    REQUIRE(chess::ConfigurationSnapshot(*parsed).find(
+                "syzygy_path=C:\\games\\see\\Syzygy345") != std::string::npos);
+
+    std::istringstream empty("[uci]\nsyzygy_path=\n");
+    const auto disabled = chess::ParseConfiguration(empty, "test.ini", &error);
+    REQUIRE(disabled.has_value());
+    REQUIRE(disabled->syzygy_path.empty());
 }
 
 TEST_CASE("Search invalidates cached scores for pruning policies", "[config][search]") {

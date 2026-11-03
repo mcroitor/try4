@@ -9,6 +9,17 @@ https://github.com/niklasf/python-chess/blob/master/chess/polyglot.py and are
 specified at https://www.chessprogramming.org/Polyglot.
 The book reader and hash implementation in try4 are independently implemented.
 
+## Fathom Syzygy probing library
+
+`src/third_party/fathom/` contains the Fathom Syzygy tablebase probing
+library (copyright 2013-2018 Ronald de Man, 2015 basil00, and 2016-2024 Jon
+Dart) under the MIT license. The license text is in
+`src/third_party/fathom/LICENSE`. Fathom is compiled into the engine to read
+external `.rtbw`/`.rtbz` files; no tablebase data is bundled or redistributed.
+The user selects a tablebase directory with `SyzygyPath` or
+`[uci] syzygy_path`. Syzygy tablebase files themselves are external data; see
+[docs/SYZYGY.md](docs/SYZYGY.md) for layout and provenance guidance.
+
 ## Catch2
 
 Tests fetch Catch2 v3.5.2, copyright Catch2 contributors, under the Boost

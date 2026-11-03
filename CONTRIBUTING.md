@@ -21,5 +21,6 @@ strength changes need reproducible comparisons; avoid claims based on a small
 self-play sample.
 
 Contributions to the project code are provided under the [MIT license](LICENSE).
-Identify the source and license of any external code or data. Opening books are
-not bundled in runtime packages. See [third-party notices](THIRD_PARTY_NOTICES.md).
+Identify the source and license of any external code or data. Opening books and
+Syzygy tablebase files are not bundled in runtime packages. See
+[third-party notices](THIRD_PARTY_NOTICES.md).

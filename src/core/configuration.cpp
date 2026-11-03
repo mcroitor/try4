@@ -80,6 +80,36 @@ bool Array(const std::string& text, std::array<int, N>* values, int maximum) {
     return true;
 }
 
+// Task 035: Fathom accepts a separator-separated directory list (`;` on
+// Windows, `:` on POSIX). Resolve each non-empty relative component against the
+// configuration file's directory.
+std::string ResolveTablebasePathList(const std::string& value,
+                                    const std::filesystem::path& base) {
+#ifdef _WIN32
+    constexpr char separator = ';';
+#else
+    constexpr char separator = ':';
+#endif
+    std::string result;
+    std::size_t begin = 0;
+    while (true) {
+        const std::size_t end = value.find(separator, begin);
+        std::string part = value.substr(
+            begin, end == std::string::npos ? std::string::npos : end - begin);
+        if (!part.empty()) {
+            const auto candidate = std::filesystem::u8path(part);
+            if (candidate.is_relative()) {
+                part = (base / candidate).lexically_normal().u8string();
+            }
+        }
+        if (!result.empty()) { result.push_back(separator); }
+        result += part;
+        if (end == std::string::npos) { break; }
+        begin = end + 1;
+    }
+    return result;
+}
+
 bool Assign(UciOptions* options, const std::string& section,
             const std::string& key, const std::string& value) {
     auto& o = *options;
@@ -94,6 +124,7 @@ bool Assign(UciOptions* options, const std::string& section,
         if (key == "move_overhead_ms") { return Integer(value, &o.move_overhead_ms, 0, 5000); }
         if (key == "threads") { return Integer(value, &o.threads, 1, kMaxUciThreads); }
         if (key == "book_max_ply") { return Integer(value, &o.book_max_ply, 0, 10000); }
+        if (key == "syzygy_path") { o.syzygy_path = value; return true; }
     } else if (section == "evaluation") {
         auto& p = o.evaluation;
         if (key == "material_mg") { return Array(value, &p.material_mg, 10000); }
@@ -183,11 +214,15 @@ std::optional<UciOptions> LoadConfiguration(const std::filesystem::path& path, s
         return std::nullopt;
     }
     auto options = ParseConfiguration(file, path.u8string(), error);
+    const auto base = std::filesystem::absolute(path).parent_path();
     if (options && !options->book_path.empty()) {
         const auto book = std::filesystem::u8path(options->book_path);
         if (book.is_relative()) {
-            options->book_path = (std::filesystem::absolute(path).parent_path() / book).lexically_normal().u8string();
+            options->book_path = (base / book).lexically_normal().u8string();
         }
+    }
+    if (options && !options->syzygy_path.empty()) {
+        options->syzygy_path = ResolveTablebasePathList(options->syzygy_path, base);
     }
     return options;
 }
@@ -214,7 +249,8 @@ std::string ConfigurationSnapshot(const UciOptions& o) {
     std::ostringstream out;
     out << "[uci]\nhash_mb=" << o.hash_mb << "\nmove_overhead_ms=" << o.move_overhead_ms
         << "\nthreads=" << o.threads << "\nown_book=" << (o.book_enabled ? "true" : "false")
-        << "\nbook_file=" << o.book_path << "\nbook_max_ply=" << o.book_max_ply << '\n';
+        << "\nbook_file=" << o.book_path << "\nbook_max_ply=" << o.book_max_ply
+        << "\nsyzygy_path=" << o.syzygy_path << '\n';
     out << "[evaluation]\n";
     const auto array = [&out](const char* name, const auto& values) {
         out << name << '=';

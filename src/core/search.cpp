@@ -12,6 +12,7 @@
 
 #include "chess/evaluation.hpp"
 #include "chess/see.hpp"
+#include "chess/syzygy.hpp"
 #include "chess/time_manager.hpp"
 #include "chess/transposition_table.hpp"
 
@@ -74,6 +75,7 @@ struct SearchContext {
     EvaluationParameters evaluation;
     ForcingSearchSettings forcing;
     TranspositionTable* table = nullptr;
+    const SyzygyTablebase* tablebase = nullptr;
     bool aborted = false;
 
     Move killers[kMaxPly][2] = {};
@@ -472,6 +474,19 @@ int Negamax(Position& position, int depth, int alpha, int beta, int ply,
         return 0;
     }
 
+    // Task 035: raw WDL is safe only when the halfmove clock is zero, because
+    // the WDL tables do not encode distance-to-zero. The root probe handles
+    // nonzero clocks with DTZ; interior probes are limited to freshly zeroed
+    // clocks so a fifty-move draw can never be scored as a win.
+    if (context.tablebase != nullptr && ply > 0 &&
+        position.HalfmoveClock() == 0 &&
+        context.tablebase->CanProbe(position)) {
+        int wdl = 0;
+        if (context.tablebase->ProbeWdl(position, &wdl)) {
+            return SyzygyScoreFromWdl(wdl);
+        }
+    }
+
     if (depth <= 0) {
         if (context.use_quiescence) {
             return Quiescence(position, alpha, beta, ply, 0, context);
@@ -725,6 +740,7 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
             limits.usePrincipalVariation ||
         previous_policy_->useAspirationWindows !=
             limits.useAspirationWindows ||
+        previous_policy_->tablebase != limits.tablebase ||
         previous_policy_->pruning != limits.pruning) {
         table_.Clear();
         previous_policy_ = limits;
@@ -763,6 +779,25 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
         limits.forcing.hard_plies < 1 || limits.forcing.hard_plies > 120 ||
         limits.forcing.max_plies > limits.forcing.hard_plies) {
         return info;
+    }
+
+    // Task 035: a complete root probe is faster and more accurate than search.
+    // It uses DTZ with the current halfmove clock, so the reported score is
+    // already adjusted for the fifty-move rule. A missing material file simply
+    // falls through to the normal search.
+    if (limits.tablebase != nullptr) {
+        const std::optional<SyzygyRootResult> tablebase_result =
+            limits.tablebase->ProbeRoot(root);
+        if (tablebase_result.has_value()) {
+            info.depth = 0;
+            info.scoreCp = tablebase_result->scoreCp;
+            info.bestMove = tablebase_result->bestMove;
+            info.pv.assign(1, tablebase_result->bestMove);
+            info.tablebase = true;
+            info.tablebaseWdl = tablebase_result->wdl;
+            info.tablebaseDtz = tablebase_result->dtz;
+            return info;
+        }
     }
 
     const TimeBudget budget =
@@ -815,6 +850,7 @@ SearchInfo Searcher::Search(const Position& position, const SearchLimits& reques
     context.evaluation_mode = limits.evaluationMode;
     context.evaluation = limits.evaluation;
     context.forcing = limits.forcing;
+    context.tablebase = limits.tablebase;
     if (budget.softMs.has_value()) {
         context.soft_deadline =
             start + std::chrono::milliseconds(*budget.softMs);

@@ -18,15 +18,20 @@ hardware description through `--hardware` when collecting reusable benchmarks.
 Precedence: built-ins < startup file < later UCI `setoption`. `ucinewgame`
 retains session overrides. UCI advertises effective startup defaults. Evaluation
 and forcing settings are file-only; restart to change them. Each search owns
-a settings snapshot, and changed evaluation/forcing/quiescence policy clears
-the TT before reuse. No environment expansion or file hot reload is performed.
+a settings snapshot, and changed evaluation/forcing/quiescence policy or
+`SyzygyPath` clears the TT before reuse. No environment expansion or file hot
+reload is performed.
 
 Copy `config/try4.ini` (all defaults) or the packaged documentation example.
 It is never automatically installed beside the executable. Relative `book_file`
-paths are relative to the file's directory. Later UCI BookFile paths remain
-relative to process working directory. Paths are unquoted literal values:
-spaces, `#`, `;`, backslashes, and `=` are preserved internally. Leading/trailing
-whitespace is stripped. `book_file=` means no book.
+and `syzygy_path` paths are relative to the file's directory. Later UCI
+BookFile/SyzygyPath paths remain relative to process working directory. Paths
+are unquoted literal values: spaces, backslashes, and `=` are preserved
+internally, while `#` and a leading `;` only start a comment at the very
+beginning of a trimmed line. For `[uci] syzygy_path`, Fathom's directory-list
+separator (`;` on Windows, `:` on POSIX) separates directories instead of being
+part of a path. Leading/trailing whitespace is stripped. `book_file=` means no
+book; `syzygy_path=` disables tablebase probing.
 
 ## Grammar and schema
 
@@ -45,6 +50,7 @@ UTF-8/NUL, lines over 64 KiB, and invalid ranges fail with file/line/key context
 | own_book | true |
 | book_file | empty string |
 | book_max_ply | 0–10000; 40; 0 means unlimited |
+| syzygy_path | empty string; external Syzygy directory list; empty disables probing |
 
 `[evaluation]` defaults are listed in the example:
 

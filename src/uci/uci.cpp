@@ -49,6 +49,16 @@ using Ms = std::chrono::milliseconds;
 // Task 058: the resignation diagnostic reuses the mate-distance formatting of
 // EmitInfo; a negative mate score prints via the mate notation, anything else
 // as plain centipawns.
+const char* SyzygyWdlName(int wdl) {
+    switch (wdl) {
+        case 2: return "win";
+        case 1: return "cursed-win";
+        case 0: return "draw";
+        case -1: return "blessed-loss";
+        default: return "loss";
+    }
+}
+
 std::string ResignDiagnostic(const SearchInfo& info, int threshold) {
     std::ostringstream oss;
     if (std::abs(info.scoreCp) >= kMateThreshold) {
@@ -180,6 +190,11 @@ std::optional<std::int64_t> ParseInt(const std::string& text) {
     return value;
 }
 
+// String-valued path options use the literal `<empty>` for "no file".
+std::string NormalizeOptionPath(const std::string& value) {
+    return value == "<empty>" ? std::string() : value;
+}
+
 }  // namespace
 
 UciEngine::UciEngine(const UciOptions& options)
@@ -187,6 +202,37 @@ UciEngine::UciEngine(const UciOptions& options)
     position_.SetupInitial();
     if (!options_.book_path.empty()) {
         book_ = LoadBookAuto(options_.book_path, &book_error_);
+    }
+    ReloadSyzygy();
+}
+
+void UciEngine::ReloadSyzygy() {
+    // A literal `<empty>` (e.g. from a config file) means "no tablebase".
+    options_.syzygy_path = NormalizeOptionPath(options_.syzygy_path);
+    syzygy_.reset();
+    syzygy_error_.clear();
+    if (!options_.syzygy_path.empty()) {
+        syzygy_ = std::make_unique<SyzygyTablebase>();
+        if (!syzygy_->Load(options_.syzygy_path, &syzygy_error_)) {
+            syzygy_.reset();
+        }
+    }
+}
+
+void UciEngine::WriteBookStatus(std::ostream& out) const {
+    if (!book_error_.empty()) {
+        out << "info string Book load failed: " << book_error_ << '\n';
+    } else if (book_) {
+        out << "info string Book loaded: " << book_->Name() << '\n';
+    }
+}
+
+void UciEngine::WriteSyzygyStatus(std::ostream& out) const {
+    if (!syzygy_error_.empty()) {
+        out << "info string Syzygy load failed: " << syzygy_error_ << '\n';
+    } else if (syzygy_ && syzygy_->Ready()) {
+        out << "info string Syzygy loaded: " << syzygy_->MaxPieces()
+            << "-piece tables\n";
     }
 }
 
@@ -209,7 +255,7 @@ void UciEngine::SetOption(const std::string& name, const std::string& value) {
     // Options may replace the book or resize the TT: join before mutation.
     Stop();
     if (name == "BookFile") {
-        options_.book_path = value == "<empty>" ? "" : value;
+        options_.book_path = NormalizeOptionPath(value);
         book_.reset();
         book_error_.clear();
         if (!options_.book_path.empty()) {
@@ -223,8 +269,14 @@ void UciEngine::SetOption(const std::string& name, const std::string& value) {
         if (const auto ply = ParseInt(value); ply && *ply >= 0 && *ply <= 10000) {
             options_.book_max_ply = static_cast<int>(*ply);
         }
-    }
-    if (name == "Hash") {
+    } else if (name == "SyzygyPath") {
+        options_.syzygy_path = NormalizeOptionPath(value);
+        ReloadSyzygy();
+        // The tablebase pointer is part of the search policy, but a reload can
+        // reuse the same address. Clear explicitly so old TB scores cannot
+        // survive a SyzygyPath change.
+        searcher_->ClearTranspositionTable();
+    } else if (name == "Hash") {
         if (auto mb = ParseInt(value); mb.has_value() && *mb >= 1 && *mb <= 131072) {
             options_.hash_mb = static_cast<std::size_t>(*mb);
             searcher_->ResizeTranspositionTable(options_.hash_mb);
@@ -292,6 +344,7 @@ void UciEngine::HandleUci(std::ostream& out) {
     const std::lock_guard<std::mutex> lock(output_mutex_);
     out << "id name try4 " << kVersion << '\n';
     out << "id author try4\n";
+    WriteSyzygyStatus(out);
     out << "option name Hash type spin default " << startup_options_.hash_mb << " min 1 max 131072\n";
     out << "option name Move Overhead type spin default " << startup_options_.move_overhead_ms << " min 0 max 5000\n";
     out << "option name Threads type spin default 1 min 1 max "
@@ -299,6 +352,10 @@ void UciEngine::HandleUci(std::ostream& out) {
     out << "option name OwnBook type check default " << (startup_options_.book_enabled ? "true" : "false") << '\n';
     out << "option name BookFile type string default " << (startup_options_.book_path.empty() ? "<empty>" : startup_options_.book_path) << '\n';
     out << "option name BookMaxPly type spin default " << startup_options_.book_max_ply << " min 0 max 10000\n";
+    out << "option name SyzygyPath type string default "
+        << (startup_options_.syzygy_path.empty() ? "<empty>"
+                                                : startup_options_.syzygy_path)
+        << '\n';
     out << "option name Resign type spin default " << startup_options_.resign_cp
         << " min -100000 max 0 (0 disables resignation)\n";
     out << "uciok\n" << std::flush;
@@ -322,12 +379,12 @@ void UciEngine::HandleSetOption(const std::string& args) {
         name += token;
     }
     SetOption(name, value);
-    if (name == "BookFile" && output_ != nullptr) {
+    if ((name == "BookFile" || name == "SyzygyPath") && output_ != nullptr) {
         const std::lock_guard<std::mutex> lock(output_mutex_);
-        if (!book_error_.empty()) {
-            *output_ << "info string Book load failed: " << book_error_ << '\n';
-        } else if (book_) {
-            *output_ << "info string Book loaded: " << book_->Name() << '\n';
+        if (name == "BookFile") {
+            WriteBookStatus(*output_);
+        } else {
+            WriteSyzygyStatus(*output_);
         }
         output_->flush();
     }
@@ -425,6 +482,7 @@ void UciEngine::HandleGo(std::ostream& out, const std::string& args) {
     limits.useTranspositionTable = true;
     limits.usePrincipalVariation = true;
     limits.useAspirationWindows = true;
+    limits.tablebase = syzygy_.get();
 
     // Apply move overhead to time limits.
     if (limits.moveTimeMs.has_value()) {
@@ -577,6 +635,9 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
             helper_threads.emplace_back([&, index]() {
                 SearchLimits helper_limits = limits;
                 helper_limits.useMoveOrdering = false;
+                // Fathom root probing is a root-only operation; keep helpers
+                // tablebase-free so the PoC never probes concurrently.
+                helper_limits.tablebase = nullptr;
                 helper_results[static_cast<std::size_t>(index)] =
                     HelperWorker(position, helper_limits, hash_mb_per_worker,
                                  stop, &snapshot);
@@ -592,6 +653,12 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
     };
     SearchInfo info = searcher_->Search(position, limits, stop, on_progress);
     UciDebug("worker: search returned");
+    if (info.tablebase) {
+        const std::lock_guard<std::mutex> lock(output_mutex_);
+        out << "info string Syzygy WDL " << SyzygyWdlName(info.tablebaseWdl)
+            << " DTZ " << info.tablebaseDtz << '\n';
+        out.flush();
+    }
 
 #ifdef TRY4_SMP_POC
     std::uint64_t aggregate_nodes = info.nodes;
@@ -607,8 +674,9 @@ void UciEngine::SearchWorker(const Position& position, const SearchLimits& limit
     // the same depth with a strictly better score; equal results keep the
     // main worker's iteration (deterministic). The helper's move is checked
     // against the root before it can be reported.
-    if (snapshot.Depth() > info.depth ||
-        (snapshot.Depth() == info.depth && snapshot.ScoreCp() > info.scoreCp)) {
+    if (!info.tablebase &&
+        (snapshot.Depth() > info.depth ||
+         (snapshot.Depth() == info.depth && snapshot.ScoreCp() > info.scoreCp))) {
         const SearchInfo candidate = snapshot.ToInfo();
         if (candidate.bestMove.has_value() &&
             position.IsLegal(*candidate.bestMove)) {

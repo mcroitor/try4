@@ -19,6 +19,7 @@
 #include "chess/opening_book.hpp"
 #include "chess/position.hpp"
 #include "chess/search.hpp"
+#include "chess/syzygy.hpp"
 
 namespace chess {
 
@@ -46,6 +47,10 @@ struct UciOptions {
     std::string book_path;        // Path to book file (.bin or .txt)
     bool book_enabled = true;     // Whether to use book
     int book_max_ply = 40;        // Maximum ply to use book (0 = unlimited)
+
+    // Task 035: optional external Syzygy directory list. Empty disables
+    // probing and keeps the default build data-free.
+    std::string syzygy_path;
     EvaluationParameters evaluation;
     ForcingSearchSettings forcing;
 };
@@ -103,6 +108,14 @@ private:
     // Parsing helpers.
     static std::optional<GoCommand> ParseGoCommand(const std::string& args);
 
+    // Optional-asset helpers. `ReloadSyzygy` builds the tablebase from the
+    // current `syzygy_path` option (constructor and `SyzygyPath` changes);
+    // the `Write*Status` helpers report each asset's load outcome as
+    // `info string` lines wherever the UCI spec allows them.
+    void ReloadSyzygy();
+    void WriteBookStatus(std::ostream& out) const;
+    void WriteSyzygyStatus(std::ostream& out) const;
+
     // Search worker.
     void SearchWorker(const Position& position, const SearchLimits& limits,
                       std::ostream& out);
@@ -118,6 +131,8 @@ private:
     std::unique_ptr<Searcher> searcher_;
     std::unique_ptr<OpeningBook> book_;
     std::string book_error_;
+    std::unique_ptr<SyzygyTablebase> syzygy_;
+    std::string syzygy_error_;
     std::mt19937_64 book_random_{std::random_device{}()};
     std::mutex output_mutex_;
     std::mutex stop_mutex_;

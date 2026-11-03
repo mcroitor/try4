@@ -1,0 +1,9 @@
+try4 UCI stability syzygy-1000
+engine: try4 0.1.0
+games: 1000/1000 in 1327.4s
+results W/D/L (white perspective): 444/333/223
+terminations: {'max-plies': 290, 'resignation': 667, 'threefold-repetition': 42, 'insufficient-material': 1}
+protocol failures: 667 {'resignation': 667}
+move wall ms: {'count': 86313, 'min': 1.244, 'p50': 52.125, 'p95': 103.466, 'p99': 106.256, 'max': 116.005, 'mean': 58.305}
+stop latency ms: {'count': 40, 'min': 0.089, 'p50': 0.156, 'p95': 0.298, 'p99': 1.037, 'max': 1.037, 'mean': 0.198}
+ready latency ms: {'count': 2040, 'min': 0.113, 'p50': 2.136, 'p95': 3.33, 'p99': 4.142, 'max': 7.389, 'mean': 2.221}

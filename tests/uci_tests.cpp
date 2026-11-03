@@ -43,6 +43,8 @@ TEST_CASE("UCI options", "[uci]") {
 #else
     REQUIRE(out.find("option name Threads type spin default 1 min 1 max 1") != std::string::npos);
 #endif
+    REQUIRE(out.find("option name SyzygyPath type string default <empty>") !=
+            std::string::npos);
     REQUIRE(out.find("UCI_Chess960") == std::string::npos);
 }
 
