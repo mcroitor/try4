@@ -91,7 +91,10 @@ Expected: installable artifacts and a clean test run.
 
 ### 2026-10-26 completion
 
-**Status:** Done (local release; no remote).
+**Status:** Done (historical local packaging). As of 2026-11-03 the repository
+is hosted on GitHub and baseline CI passes on Ubuntu/MSVC/sanitizers; candidate
+Release-workflow evidence remains task 047 work. The bullets below record the
+original 2026-10-26 observations, not current publication status.
 
 - CMake install and CPack ZIP rules produce version/platform/architecture
   archives with SHA-256 sidecars and no opening books/test data.

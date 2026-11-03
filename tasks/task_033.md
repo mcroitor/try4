@@ -10,8 +10,12 @@
 | **Priority** | P2 |
 | **Status** | Ready |
 
-**Deferral note (2026-10, remaining-task chain pass).** This is the only task
-left open in the 001-058 chain. It was not started in the late-October
+**Current status (2026-11-03).** Basic occupancy-mask helpers and tests have
+landed (`244f98c`, corrected by `de4ec8f`). Position and move generation still
+use 0x88; attack tables, incremental bitboard state and migration benchmarks
+are not implemented. Task 047 also remains open for release verification.
+
+**Deferral note (2026-10, remaining-task chain pass).** It was not started in the late-October
 strength pass (tasks 057, 058, 034, 048 and 035's close-out) because it is a
 multi-day full representation rewrite (movegen, position, incremental state)
 where a half-landed state is worse than a clean deferral. Two findings from

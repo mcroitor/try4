@@ -7,7 +7,7 @@
 | **Depends on** | 039, 043 |
 | **Estimate** | 0.5-1 day |
 | **Priority** | P1 |
-| **Status** | Ready |
+| **Status** | Done |
 
 ## Objective
 
@@ -257,6 +257,38 @@ report.
 | Config and UCI defaults diverge | Reuse the same field and range; test handshake, snapshot and precedence |
 
 ## Completion report
+
+### Reconciled completion — 2026-11-03
+
+**Status:** Done (engine policy, configuration and harness implementation).
+The implementation was present before PR #11 and is merged into `main` at
+`e6d6b07`. This is independent of task 047's release/GUI verification.
+
+- `UciOptions::resign_cp`, `[search] resign_cp`, the `Resign` spin option,
+  snapshot and example configuration use the same `-600` default and
+  `-100000..0` range; zero disables resignation.
+- `src/uci/uci.cpp` checks the last completed score and emits
+  `info string resign score cp <score> threshold <threshold>` (or mate notation)
+  followed by `bestmove 0000`, using a strict comparison and cancellation,
+  infinite-search and depth-zero exclusions.
+- `tests/configuration_tests.cpp`, `tests/uci_tests.cpp` and
+  `tests/engine_process_tests.py` cover configuration validation, advertising,
+  default resignation, disabled resignation and negative-mate output.
+- `scripts/search_bench.py` and `scripts/benchmark_forcing.py` disable
+  resignation for measurement; `scripts/uci_stability.py` accepts startup
+  configuration and recognizes resignation terminations.
+- The archived Syzygy 1,000-game run includes 667 resignation terminations,
+  with no illegal moves, crashes or time forfeits; see
+  `docs/stability/syzygy-1000/README.md`.
+- Hosted [CI run 41582984398](https://github.com/mcroitor/try4/actions/runs/41582984398)
+  passed Ubuntu, Windows/MSVC and Linux ASan/UBSan on `e6d6b07`. Current local
+  candidate Debug/Release and package results are recorded in
+  `docs/RELEASE_CANDIDATE.md`.
+
+**Verification boundary:** this report does not claim that every row R1–R17
+has a dedicated automated test. In particular, a real GUI's handling of
+`bestmove 0000` has no archived transcript; task 047 tracks that check. The
+completion scope is implemented engine/harness behavior, not GUI certification.
 
 Record:
 

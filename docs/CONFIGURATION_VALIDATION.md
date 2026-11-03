@@ -87,8 +87,9 @@ records the actual configuration text and process wall times. Concurrent
 build/test activity can affect timing; this small run is not a performance
 guarantee.
 
-The feature code is committed and the release archives are verified in
-[`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md). Hosted CI, MSVC and a separate
-physical clean machine remain unverified; the local clean-clone run and
-isolated-PATH package checks are the substitute. No public release was possible
-because the repository has no remote.
+The original feature code and release archives are verified in the historical
+[`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md). At that validation date no
+remote, hosted CI or MSVC environment was available. As of 2026-11-03 the source
+is hosted on GitHub and `e6d6b07` passes Ubuntu, Windows/MSVC and ASan/UBSan CI.
+Current candidate Release packaging and the separate physical clean-machine
+check are tracked in [`RELEASE_CANDIDATE.md`](RELEASE_CANDIDATE.md).

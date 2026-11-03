@@ -7,7 +7,7 @@
 | Depends on | 037, 038                  |
 | Estimate   | 0.5–1 day plus CI runtime |
 | Priority   | P2                        |
-| Status     | Ready                     |
+| Status     | In progress               |
 
 ## Objective
 
@@ -18,17 +18,24 @@ and does not retroactively change the 0.1.0 source or artifacts.
 
 ## Background
 
-The 0.1.0 tag is local because the repository has no remote. The final local
+The historical 2026-10-26 report records a local 0.1.0 tag and no remote. The final local
 matrix passed from the working tree and from a fresh local clone, including
 Windows Debug/Release, Ubuntu Release, Linux ASan/UBSan, deep perft depth 5–6,
 the 1,000-game protocol run and extracted-archive verification. Those results
 are recorded in `docs/RELEASE_VALIDATION.md`.
 
+**Reconciled 2026-11-03:** source is hosted on GitHub and merged `e6d6b07`
+passes Ubuntu, Windows/MSVC and ASan/UBSan CI. No local/remote tags or GitHub
+releases are currently present. This task prepares **0.1.1** on `feat/047`
+because the newer engine includes post-0.1.0 changes; it does not re-tag old
+source. Current evidence and publication steps are in
+[`docs/RELEASE_CANDIDATE.md`](../docs/RELEASE_CANDIDATE.md).
+
 ## Scope
 
-1. Configure a remote and run `.github/workflows/release.yml` on the `v0.1.0`
-   tag. Confirm the sanitizer and both package matrix jobs pass and attach the
-   generated JUnit reports.
+1. Run `.github/workflows/release.yml` manually on the committed 0.1.1 candidate,
+   then on its final `v0.1.1` tag. Confirm sanitizer and both package matrix jobs
+   pass; archive the JUnit reports, source/toolchain provenance and checksums.
 2. Build and run the full suite with MSVC on Windows in addition to the tested
    MinGW/GCC build.
 3. Repeat build/test/package/verify on a separate physical clean machine, with
@@ -44,17 +51,32 @@ are recorded in `docs/RELEASE_VALIDATION.md`.
 
 ## Acceptance criteria
 
-- [ ] Hosted CI is green for the tag and the JUnit reports are attached.
-- [ ] MSVC build/test result is recorded.
+- [ ] Hosted Release CI is green for the candidate/tag and JUnit reports are attached.
+- [x] MSVC Debug build/test result is recorded (merged `e6d6b07`, run 41582984398); candidate Release coverage remains pending.
 - [ ] Separate physical clean-machine build/test/package result is recorded.
-- [ ] The supported Linux glibc baseline is stated and verified, or explicitly
-      limited.
+- [x] Local Linux ZIP support is explicitly limited to tested Ubuntu 26.04.1/WSL2 with glibc 2.43; GLIBC/GLIBCXX/CXXABI requirements are recorded in the candidate report. Hosted ZIPs require their own ABI evidence.
 - [ ] A GUI transcript is archived with no illegal move, hang or forfeit.
-- [ ] Any strength experiment has a recorded protocol and uncertainty, or is
-      explicitly left undone.
+- [x] No candidate strength claim: longer paired-game validation is explicitly left undone; the historical eight-game TSCP sample is not the 200-game S3 gate.
 
 ## Constraints
 
 - Do not move or re-tag `v0.1.0`; publish a new patch version if source changes.
 - Do not claim hosted CI, MSVC or clean-machine results before they exist.
 - Do not change default engine behavior in this verification task.
+
+## Progress report — 2026-11-03
+
+- Created `feat/047`; reconciled completed task reports and task 058's status.
+- Prepared CMake version 0.1.1, candidate notes and a current evidence matrix.
+- Release workflow retains failure-time JUnit/logs and successful-package source
+  and toolchain provenance; SMP remains disabled in release packages.
+- Hosted baseline CI is green on Ubuntu, Windows/MSVC and Linux ASan/UBSan.
+- Local candidate test/package results are recorded in `docs/RELEASE_CANDIDATE.md`.
+- Windows Debug, Windows Release and Ubuntu/WSL2 Release pass **30/30 CTest
+  targets each**. Both ZIPs pass SHA-256/extracted-package verification; optional
+  Syzygy cases pass 9/9 with external data on both platforms. Local Linux
+  support is explicitly limited to the tested Ubuntu/glibc/runtime environment.
+- **Open:** candidate hosted Release workflow, tag/publication, separate physical
+  clean machine, hosted-package Linux ABI evidence and GUI transcript. SSH push
+  authentication is unavailable in this shell; dispatch needs an authenticated
+  client. This task is not Done.

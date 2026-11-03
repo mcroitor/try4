@@ -119,8 +119,8 @@ python scripts/search_bench.py --engine build/performance/try4_uci.exe \
 
 ## Completion report
 
-**Status:** Done (implementation on `feat/056`; PR pending because remote push
-still lacks SSH credentials).
+**Status:** Done. Merged into `main` by PR #10 (`a887a6e`); hosted CI on
+`e6d6b07` passed on 2026-11-03. The original measurements below are historical.
 
 **Defaults** (all four techniques implemented, every one individually
 switchable; `PruningSettings` inside `SearchLimits`, included in the

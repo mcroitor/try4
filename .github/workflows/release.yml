@@ -11,11 +11,15 @@ permissions:
 jobs:
   sanitizers:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
       - name: Configure sanitizers
         run: >
           cmake -S . -B build/asan -DCMAKE_BUILD_TYPE=Debug
@@ -23,12 +27,15 @@ jobs:
           -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
       - run: cmake --build build/asan --parallel 2
-      - run: ctest --test-dir build/asan --output-on-failure --output-junit build/asan/asan-regression.xml
+      - run: ctest --test-dir build/asan --output-on-failure --output-junit "${{ github.workspace }}/build/asan/asan-regression.xml"
       - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
           name: try4-asan
-          path: build/asan/asan-regression.xml
-          if-no-files-found: error
+          path: |
+            build/asan/asan-regression.xml
+            build/asan/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
 
   package:
     needs: sanitizers
@@ -37,6 +44,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,9 +54,32 @@ jobs:
         run: >
           cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release
           -DTRY4_BUILD_TESTS=ON -DTRY4_WARNINGS_AS_ERRORS=ON
-          -DTRY4_PORTABLE_WINDOWS=ON
+          -DTRY4_PORTABLE_WINDOWS=ON -DTRY4_SMP_POC=OFF
       - run: cmake --build build/release --config Release --parallel 2
-      - run: ctest --test-dir build/release -C Release --output-on-failure --output-junit build/release/regression.xml
+      - name: Record candidate provenance
+        shell: bash
+        run: |
+          git show --no-patch --format=fuller HEAD > build/release/source.txt
+          cmake --version >> build/release/source.txt
+          python --version >> build/release/source.txt
+          cat build/release/CMakeCache.txt >> build/release/source.txt
+          cat build/release/CMakeFiles/*/CMakeCXXCompiler.cmake >> build/release/source.txt
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            ldd --version >> build/release/source.txt
+            objdump -p build/release/try4_uci >> build/release/source.txt
+            objdump -p build/release/try4 >> build/release/source.txt
+          fi
+      - run: ctest --test-dir build/release -C Release --output-on-failure --output-junit "${{ github.workspace }}/build/release/regression.xml"
+      - name: Archive regression evidence
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: try4-regression-${{ matrix.os }}
+          path: |
+            build/release/regression.xml
+            build/release/Testing/Temporary/LastTest.log
+            build/release/source.txt
+          if-no-files-found: warn
       - name: Package
         run: cpack --config build/release/CPackConfig.cmake -C Release
       - name: Verify extracted archive and checksum
@@ -62,4 +93,5 @@ jobs:
             build/release/packages/*.zip
             build/release/packages/*.sha256
             build/release/regression.xml
+            build/release/source.txt
           if-no-files-found: error

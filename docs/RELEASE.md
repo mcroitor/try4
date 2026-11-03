@@ -1,11 +1,14 @@
 # Release engineering
 
-Stage 8 consists of tasks 036–038. Version **0.1.0** was tagged locally as
-`v0.1.0` on 2026-10-26 after the final gate matrix; the repository has no remote,
-so the tag and archives are unpublished. CMake's `project(... VERSION ...)` is
-the single version source. Its generated header supplies both `--version` and
-UCI `id name`. Actual observations and checksums are in
-[`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md).
+The current candidate is **0.1.1**, prepared under task 047 on `feat/047`.
+CMake's `project(... VERSION ...)` is the single version source. Its generated
+header supplies both `--version` and UCI `id name`. Current observations and
+remaining gates are in [`RELEASE_CANDIDATE.md`](RELEASE_CANDIDATE.md).
+
+Tasks 036–038 and [`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md) record the
+historical 0.1.0 local validation. GitHub now hosts the source and CI; no local
+or remote tags or GitHub releases were present on 2026-11-03. Do not recreate or
+move the historical `v0.1.0` tag to point at newer source.
 
 ## Build, test, install, package
 
@@ -20,20 +23,23 @@ cpack --config build/release-check/CPackConfig.cmake -C Release
 ```
 
 Archives are written under `build/release-check/packages/`, for example
-`try4-0.1.0-windows-x86_64.zip` and `try4-0.1.0-linux-x86_64.zip`, each accompanied
+`try4-0.1.1-windows-x86_64.zip` and `try4-0.1.1-linux-x86_64.zip`, each accompanied
 by `<archive>.sha256`. ZIPs contain the UCI engine, debug CLI, license, notices,
 and release/usage documents. They exclude opening books, tests, and test data.
 
 Verify an archive (Python 3, standard library only):
 
 ```sh
-python scripts/verify_release.py build/release-check/packages/try4-0.1.0-windows-x86_64.zip
+python scripts/verify_release.py build/release-check/packages/try4-0.1.1-windows-x86_64.zip
 ```
 
 The script checks SHA-256, extracts to a temporary directory, runs both version
 commands and a UCI search/stop handshake with compiler directories removed from
 PATH, and checks package contents. This is an isolated-directory smoke test;
 it does not replace clean-machine verification.
+
+Package-content checks require Syzygy setup documentation and the Fathom MIT
+notice, and reject bundled `.rtbw`/`.rtbz` files as well as opening data.
 
 Windows defaults to static C++ runtimes (`TRY4_PORTABLE_WINDOWS=ON`): `/MT` for
 MSVC and static GCC/libstdc++/winpthread linkage for MinGW. Linux uses the host
@@ -47,8 +53,19 @@ specific tested artifacts, not a guarantee of bit-for-bit reproducibility.
 `.github/workflows/release.yml` runs on `v*` tags or manual dispatch. It runs
 Linux sanitizers, tests Windows/Linux Release builds, creates packages, verifies
 extracted executables/checksums, and uploads workflow artifacts and regression
-reports. The verifier rejects tags inconsistent with the CMake version.
+reports. JUnit reports and test logs are retained even when a test fails;
+successful package artifacts include source SHA, CMake/toolchain configuration
+and Linux runner glibc provenance. The verifier rejects tags inconsistent with
+the CMake version. Ordinary `ci.yml` success is Debug/sanitizer evidence, not
+Release-package verification.
 The workflow creates candidate artifacts; it does not publish a GitHub release.
+
+After the candidate is committed and pushed, select **Actions → Release
+artifacts → Run workflow → feat/047** to verify that exact commit before
+tagging. Record the workflow URL, source SHA, JUnit counts, archive hashes and
+platform/toolchain details in the candidate report. The current environment's
+SSH push authentication is unavailable, so remote dispatch must be performed
+from an authenticated client.
 
 ## Final release gate
 
@@ -66,23 +83,24 @@ Task 038 requires evidence for all of these on the final source:
 - All P0/P1 issues resolved, including task 039's UCI conformance pass.
 - MIT license, changelog, release notes and contribution instructions present.
 
-The 0.1.0 matrix passed those gates. Hosted CI, MSVC and a separate physical
-clean machine remain documented limitations because no remote was configured and
-those environments were unavailable. Never describe the local tag as a public
-release.
+The historical 0.1.0 local matrix passed its recorded gates. Hosted Ubuntu,
+Windows/MSVC and ASan/UBSan CI now pass for `e6d6b07`, but those results do not
+certify the later 0.1.1 candidate or its packages. Task 047 still requires the
+candidate Release workflow, separate clean-machine evidence, a supported Linux
+ABI baseline and an archived GUI game. Do not describe a candidate as released.
 
 To repeat the clean-checkout gate:
 
 ```sh
-git clone <local-repository> try4-clean
+git clone https://github.com/mcroitor/try4.git try4-clean
 cd try4-clean
-git checkout v0.1.0
+git checkout <candidate-commit-sha>
 cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release \
   -DTRY4_BUILD_TESTS=ON -DTRY4_WARNINGS_AS_ERRORS=ON
 cmake --build build/release --config Release --parallel 2
 ctest --test-dir build/release -C Release --output-on-failure
 cpack --config build/release/CPackConfig.cmake -C Release
-python scripts/verify_release.py build/release/packages/try4-0.1.0-*.zip
+python scripts/verify_release.py build/release/packages/<exact-archive-name>.zip
 ```
 
 For a Linux sanitizer build:
@@ -95,5 +113,7 @@ ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_
 
 Archive commands, reports, compiler versions, hardware and checksums with the
 candidate. Update `RELEASE_VALIDATION.md` with actual observations.
-Once every gate passes, commit the tested source and tag `v0.1.0` on that
-commit. Never tag uncommitted working-tree changes or a failing candidate.
+Once every gate passes, commit the tested source and tag `v0.1.1` on that
+commit, push the tag, and verify the tag-triggered workflow. Publishing a GitHub
+release with those exact archives, sidecars and reports is a separate step.
+Never tag uncommitted working-tree changes or a failing candidate.

@@ -137,10 +137,12 @@ They are not calendar commitments.
 
 The owner approved task 040 on 2026-10-26: INI with optional executable-adjacent
 discovery, values/PST scales, and bounded tactical-horizon search. Tasks
-039–046 are Done, and task 038's final local gates passed with a local `v0.1.0`
-tag. Task 047 tracks the unavailable independent verification (hosted CI, MSVC,
-separate physical clean machine, GUI transcript). The tag is unpublished because
-no git remote is configured.
+039–046 are Done, and task 038 records the historical 0.1.0 local gates.
+The repository is now hosted at `github.com/mcroitor/try4`; merged `e6d6b07`
+passed Ubuntu, Windows/MSVC and ASan/UBSan CI. Task 047 is In progress for the
+0.1.1 candidate, Release-package/JUnit evidence, separate physical clean machine
+and GUI transcript. No local or remote tags or GitHub releases were present on
+2026-11-03. See `docs/RELEASE_CANDIDATE.md`.
 
 ### Parallel-search experiment (defined 2026-10-26)
 
@@ -191,7 +193,9 @@ start position reaches depth 6 at 116k NPS and Kiwipete depth 4 at 61k NPS;
 Debug is ~9-10x slower at the same depth. The earlier 2,462-node depth-4 figure
 was a warm-TT count; the harness clears the TT before every search and measures
 3,556 nodes. See `docs/PERFORMANCE.md`, "Search baseline (2026-10-27)". Task 050
-is done and task 051 is ready.
+is done; tasks 051–056 are also implemented and merged into `main`. Task 057's
+implementation report records an eight-game TSCP sample, not the planned
+200-game S3 strength gate; see its recorded follow-ups.
 
 Dependency order:
 
@@ -263,6 +267,20 @@ Parallelizable work appears after the core contracts are stable:
 | D — Release        | 038         | Full matrix, sanitizers, artifacts, and notes |
 
 ## Status summary
+
+Reconciled on **2026-11-03**:
+
+| Tasks | Current status | Evidence / remaining work |
+|---|---|---|
+| 001–032, 034–046 | Done | Core, feature and historical local release reports; current hosted CI is green |
+| 033 | Ready | Bitboard helpers/tests landed; Position/move generation still use 0x88 |
+| 047 | In progress | 0.1.1 preparation and independent release verification; see candidate report |
+| 048–056 | Done | Implementations and experiment decisions merged; SMP remains default-off |
+| 057 | Done (implementation/report) | Eight-game TSCP sample; planned 200-game, zero-forfeit S3 gate remains unverified |
+| 058 | Done | Resignation option, parser, process tests, benchmark isolation and stability handling implemented |
+
+`Done` for historical release tasks describes their recorded local scope; it
+does not imply the current candidate has passed task 047's independent gates.
 
 | Status      | Meaning                                                 |
 | ----------- | ------------------------------------------------------- |

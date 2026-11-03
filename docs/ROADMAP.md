@@ -1,7 +1,7 @@
 # try4 Chess Engine — Development Roadmap
 
-**Status:** try4 0.1.0 tagged locally as `v0.1.0` on 2026-10-26; final local release gates passed. The original checklists below are planning criteria, not a claim that every optimization target was pursued. Current evidence is in [`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md); hosted CI and a separate physical clean machine remain unverified.
-**Date:** 2026-10-23 (status updated 2026-10-26)  
+**Status:** 0.1.1 release preparation is in progress under task 047. The merged `e6d6b07` source passed hosted Ubuntu, Windows/MSVC and ASan/UBSan CI. Task 033's full bitboard migration remains Ready; task 058's resignation implementation is Done. A separate physical clean machine, archived GUI transcript and candidate Release-package workflow remain open. See [`RELEASE_CANDIDATE.md`](RELEASE_CANDIDATE.md) for current evidence; [`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md) preserves the historical 0.1.0 matrix. The original stage checklists below are planning and historical criteria, not current release certification.
+**Date:** 2026-10-23 (status updated 2026-11-03)
 **Companion document:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 ---
@@ -471,8 +471,10 @@ Start only if profiling shows a real bottleneck or a strength target requires it
 - [x] Release notes list known limitations and non-goals.
 - [x] A new user can build and run the engine from the README alone.
 - [x] No known P0/P1 defect is open for 0.1.0.
-- [ ] Hosted CI, MSVC and a separate physical clean machine (deferred; no remote
-      or environment available). The tag remains local.
+- [x] Hosted Debug CI, MSVC and ASan/UBSan on merged `e6d6b07` (2026-11-03).
+- [ ] Current candidate Release workflow, tag/publication and separate physical
+      clean-machine verification (task 047). The historical local tag is absent
+      from the current checkout and GitHub tags API.
 
 **Effort:** 2–3 days.  
 **Risk:** packaging surprises. Do a clean-machine build before tagging.
@@ -545,8 +547,8 @@ Copy this table into the project README or issue tracker and update it as stages
 | 4 — Search | Done | 2026-10-23 | 2026-10-24 | Alpha-beta, TT, quiescence, clock |
 | 5 — Evaluation | Done | 2026-10-24 | 2026-10-25 | Tapered evaluation + self-play baseline |
 | 6 — UCI | Done | 2026-10-25 | 2026-10-26 | Async UCI, books, conformance fixes; 1,000-game report |
-| 7 — Performance | Optional, not pursued | | | Profile-driven bitboards/advanced search deferred |
-| 8 — Release | Done locally | 2026-10-25 | 2026-10-26 | v0.1.0 local tag; hosted CI/clean physical machine deferred |
+| 7 — Performance | Partially complete | 2026-10-27 | | Search/evaluation work and Syzygy merged; bitboard migration 033 remains Ready; SMP experimental/default-off |
+| 8 — Release | Local baseline done; 047 in progress | 2026-10-25 | | Historical 0.1.0 matrix retained; 0.1.1 candidate preparation, hosted Release artifacts and independent checks tracked in RELEASE_CANDIDATE.md |
 
 ### Metrics to record
 

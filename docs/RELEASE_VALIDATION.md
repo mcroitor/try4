@@ -1,9 +1,18 @@
 # try4 0.1.0 release validation — 2026-10-26
 
+> Historical evidence for the 2026-10-26 source and archives. Statements about
+> unavailable remotes, CI, MSVC and unsupported features below describe that
+> validation date, not the current engine. As of 2026-11-03 the repository is
+> hosted on GitHub and merged `e6d6b07` passes Ubuntu, Windows/MSVC and sanitizer
+> CI. No local or remote tags or GitHub releases are present in the current
+> checkout/API view; the historical local tag is not available here. Current
+> 0.1.1 preparation and remaining gates are in
+> [`RELEASE_CANDIDATE.md`](RELEASE_CANDIDATE.md).
+
 **Candidate:** try4 0.1.0, tagged locally as `v0.1.0`.
 **Validated source:** `60226fa56f1098b25a9ca07a3abb44874db8b77a`.
 **Decision:** release gates passed for the tested local source and archives.
-**Publication:** no remote is configured, so the tag and artifacts are local
+**Publication at validation date:** no remote was configured, so the tag and artifacts were local
 only. Hosted CI and a separate physical clean machine were not available; see
 [Residual limitations](#residual-limitations).
 
@@ -203,7 +212,7 @@ the tested archive; the Windows package has the same entries, and its two
 executables differ only in the four/five PE-header bytes that hold the linker
 timestamp and checksum. The compiled inputs are unchanged.
 
-## Residual limitations
+## Residual limitations at validation date
 
 - No git remote is configured. `v0.1.0` and the archives are local; no public
   push or hosted GitHub Actions result exists. The workflow was syntax-checked

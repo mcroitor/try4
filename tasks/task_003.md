@@ -84,8 +84,8 @@ Expected: all characterization tests pass.
   six test cases and passes in Debug and Release.
 - The GitHub Actions workflow for Ubuntu and Windows is present under
   `.github/workflows/ci.yml`.
-- CI execution has not been verified because this repository has no remote
-  yet; it must be checked after the first push.
+- Hosted execution is now verified: [CI run 41582984398](https://github.com/mcroitor/try4/actions/runs/41582984398)
+  passed Ubuntu, Windows/MSVC and ASan/UBSan on merged `e6d6b07` (2026-11-03).
 
 ## Completion report
 

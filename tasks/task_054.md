@@ -114,8 +114,8 @@ python scripts/search_bench.py --engine build/performance/try4_uci.exe \
 
 ## Completion report
 
-**Status:** Done (implementation on `feat/054-final`; PR pending because remote
-push still lacks SSH credentials).
+**Status:** Done. Merged into `main` by PR #8 (`57fb27d`); hosted CI on
+`e6d6b07` passed on 2026-11-03. The original measurements below are historical.
 
 **Approach.** `BoardSummary` in `src/core/evaluation.cpp` walks the raw 0x88
 board exactly once (Direct board access via a `Position` friendship granted in

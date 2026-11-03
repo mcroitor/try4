@@ -92,8 +92,16 @@ def main():
         for filename in ("LICENSE", "README.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md"):
             if not list(root.rglob(filename)):
                 raise RuntimeError(f"Missing package documentation: {filename}")
+        if not list(root.rglob("SYZYGY.md")):
+            raise RuntimeError("Missing Syzygy setup documentation")
+        fathom_licenses = list(root.rglob("licenses/LICENSE"))
+        if not any("Ronald de Man" in path.read_text(encoding="utf-8")
+                   for path in fathom_licenses):
+            raise RuntimeError("Missing Fathom third-party license")
         if list(root.rglob("*.bk")) or list(root.rglob("tournament.txt")):
             raise RuntimeError("Opening data must not be bundled")
+        if list(root.rglob("*.rtbw")) or list(root.rglob("*.rtbz")):
+            raise RuntimeError("Syzygy tablebase data must not be bundled")
     print(f"PASS {archive.name}: SHA-256, versions, extracted UCI handshake, docs")
 
 
