@@ -66,8 +66,8 @@ jobs:
           cat build/release/CMakeFiles/*/CMakeCXXCompiler.cmake >> build/release/source.txt
           if [ "${RUNNER_OS}" = "Linux" ]; then
             ldd --version >> build/release/source.txt
-            objdump -p build/release/try4_uci >> build/release/source.txt
             objdump -p build/release/try4 >> build/release/source.txt
+            objdump -p build/release/try4_cli >> build/release/source.txt
           fi
       - run: ctest --test-dir build/release -C Release --output-on-failure --output-junit "${{ github.workspace }}/build/release/regression.xml"
       - name: Archive regression evidence

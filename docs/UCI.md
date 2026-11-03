@@ -1,10 +1,10 @@
 # Running try4 in a chess GUI
 
-`try4_uci` is the engine executable. `try4` is a separate inspection CLI and
+`try4` is the engine executable. `try4_cli` is a separate inspection CLI and
 must not be selected as the engine in CuteChess.
 
 1. Extract the versioned runtime ZIP.
-2. Add `bin/try4_uci.exe` on Windows or `bin/try4_uci` on Linux to CuteChess
+2. Add `bin/try4.exe` on Windows or `bin/try4` on Linux to CuteChess
    as a UCI engine. No command-line arguments are needed.
 3. Choose a time control in the GUI. The engine accepts `go depth N`,
    `go nodes N`, `go movetime MS`, and clock fields `wtime`, `btime`, `winc`,

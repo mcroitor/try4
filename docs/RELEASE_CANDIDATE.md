@@ -1,5 +1,9 @@
 # try4 0.1.1 release candidate — task 047
 
+**Latest local packages:** the executable-rename rebuild, current archive hashes
+and verification results are in [RELEASE_0.1.1_BUILD.md](RELEASE_0.1.1_BUILD.md).
+The original local archive hashes below refer to the earlier pre-rename build.
+
 **Updated:** 2026-11-03. **Status:** In progress; not tagged or published.
 **Branch:** `feat/047`. **Merged baseline:**
 `e6d6b07fcf13fdffd516fa32afaa64f8af376699` (PR #11).

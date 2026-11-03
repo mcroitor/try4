@@ -76,15 +76,15 @@ function(try4_enable_warnings target)
     endif()
 endfunction()
 
-add_library(try4_cli STATIC src/cli/cli.cpp)
-target_link_libraries(try4_cli PUBLIC try4_core)
+add_library(try4_cli_lib STATIC src/cli/cli.cpp)
+target_link_libraries(try4_cli_lib PUBLIC try4_core)
 
-add_executable(try4 apps/cli_main.cpp)
-target_link_libraries(try4 PRIVATE try4_cli)
+add_executable(try4_cli apps/cli_main.cpp)
+target_link_libraries(try4_cli PRIVATE try4_cli_lib)
 
 try4_enable_warnings(try4_core)
+try4_enable_warnings(try4_cli_lib)
 try4_enable_warnings(try4_cli)
-try4_enable_warnings(try4)
 
 add_executable(try4_perft_bench bench/perft_bench.cpp)
 target_link_libraries(try4_perft_bench PRIVATE try4_core)
@@ -102,21 +102,21 @@ target_compile_definitions(try4_selfplay PRIVATE
 )
 try4_enable_warnings(try4_selfplay)
 
-add_executable(try4_uci apps/uci_main.cpp)
-target_link_libraries(try4_uci PRIVATE try4_core)
-target_compile_definitions(try4_uci PRIVATE
+add_executable(try4 apps/uci_main.cpp)
+target_link_libraries(try4 PRIVATE try4_core)
+target_compile_definitions(try4 PRIVATE
     "TRY4_SELFPLAY_COMPILER=\"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\""
     "TRY4_SELFPLAY_BUILD_TYPE=\"$<CONFIG>\""
 )
-try4_enable_warnings(try4_uci)
+try4_enable_warnings(try4)
 
 if(MINGW AND TRY4_PORTABLE_WINDOWS)
     target_link_options(try4 PRIVATE -static -static-libgcc -static-libstdc++)
-    target_link_options(try4_uci PRIVATE -static -static-libgcc -static-libstdc++)
+    target_link_options(try4_cli PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
 
 include(GNUInstallDirs)
-install(TARGETS try4 try4_uci RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS try4 try4_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES README.md CHANGELOG.md LICENSE CONTRIBUTING.md THIRD_PARTY_NOTICES.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES docs/UCI.md docs/RELEASE.md docs/RELEASE_NOTES.md
@@ -158,7 +158,7 @@ if(TRY4_BUILD_TESTS)
 
     enable_testing()
     add_test(NAME try4_release_smoke COMMAND "${CMAKE_COMMAND}"
-        "-DUCI=$<TARGET_FILE:try4_uci>" "-DCLI=$<TARGET_FILE:try4>"
+        "-DUCI=$<TARGET_FILE:try4>" "-DCLI=$<TARGET_FILE:try4_cli>"
         "-DEXPECTED_VERSION=${PROJECT_VERSION}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/release_smoke.cmake")
     set_tests_properties(try4_release_smoke PROPERTIES LABELS release TIMEOUT 15)
@@ -205,7 +205,7 @@ if(TRY4_BUILD_TESTS)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_test(NAME try4_engine_process COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/engine_process_tests.py"
-        --engine "$<TARGET_FILE:try4_uci>" --source "${CMAKE_CURRENT_SOURCE_DIR}")
+        --engine "$<TARGET_FILE:try4>" --source "${CMAKE_CURRENT_SOURCE_DIR}")
     set_tests_properties(try4_engine_process PROPERTIES LABELS "uci;config;forcing" TIMEOUT 90)
     target_compile_definitions(try4_config_tests PRIVATE
         "TRY4_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
@@ -213,7 +213,7 @@ if(TRY4_BUILD_TESTS)
         "TRY4_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
 
     add_executable(try4_cli_tests tests/cli_tests.cpp)
-    target_link_libraries(try4_cli_tests PRIVATE try4_cli Catch2::Catch2WithMain)
+    target_link_libraries(try4_cli_tests PRIVATE try4_cli_lib Catch2::Catch2WithMain)
     try4_enable_warnings(try4_cli_tests)
     add_test(NAME try4_cli_tests COMMAND try4_cli_tests)
     set_tests_properties(try4_cli_tests PROPERTIES LABELS cli)

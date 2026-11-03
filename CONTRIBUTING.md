@@ -14,7 +14,7 @@ The first test-enabled configure fetches Catch2 v3.5.2. An existing offline
 checkout can be supplied with `-DFETCHCONTENT_SOURCE_DIR_CATCH2=/path/to/Catch2`.
 Build/test commands and package verification must pass before merging.
 
-For bugs, include the version (`try4_uci --version`), operating system,
+For bugs, include the version (`try4 --version`), operating system,
 compiler/build mode, FEN, exact UCI command sequence, and expected/actual output.
 Report timing failures with the time control and engine log. Performance or
 strength changes need reproducible comparisons; avoid claims based on a small

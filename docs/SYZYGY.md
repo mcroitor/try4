@@ -102,7 +102,7 @@ For additional development verification against an independent prober:
 
 ```sh
 python -m pip install python-chess
-python scripts/syzygy_crosscheck.py --engine build/performance/try4_uci.exe \
+python scripts/syzygy_crosscheck.py --engine build/performance/try4.exe \
   --syzygy c:\games\see\Syzygy345 --positions 200 --deep-check 60 \
   --output build/syzygy-crosscheck.json
 ```

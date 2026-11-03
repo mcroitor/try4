@@ -8,6 +8,9 @@ CI. Candidate validation and remaining gates are recorded in
 
 ## Changes since 0.1.0
 
+- Executable names now match their roles: `try4` is the playable UCI engine
+  (previously `try4_uci`), and `try4_cli` is the debugging console (previously
+  `try4`). Select `try4.exe` on Windows or `try4` on Linux in your chess GUI.
 - Optional Syzygy WDL+DTZ probing through `SyzygyPath` and `[uci] syzygy_path`,
   using the vendored MIT-licensed Fathom library. Root probes honor the
   fifty-move clock; interior WDL probes require a zero halfmove clock. Missing
@@ -48,8 +51,10 @@ startup INI configuration and session UCI overrides remain supported.
 - Evaluation/forcing startup settings require a restart; no hot reload.
 - `bestmove 0000` on resignation can be interpreted differently by different
   GUIs. Set `Resign` to `0` when the consumer does not recognize the convention.
-- Linux packages inherit the build host ABI. No older-distribution support is
-  claimed until the candidate glibc requirement is recorded and verified.
+- The local Linux x86-64 package was tested on Ubuntu 26.04.1 under WSL2
+  (glibc 2.43). It dynamically links the system C/C++ runtimes and requires
+  symbols through `GLIBC_2.34`, `GLIBCXX_3.4.32` and `CXXABI_1.3.9`.
+  Compatibility with older distributions has not been verified.
 - Hosted Debug/sanitizer CI is verified for the merged baseline. The candidate
   Release workflow, separate physical clean machine and GUI transcript remain
   task 047 gates; see its evidence matrix before publication.

@@ -570,7 +570,7 @@ class Worker:
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--engine", required=True, type=Path, help="try4_uci executable")
+    parser.add_argument("--engine", required=True, type=Path, help="try4 UCI executable")
     parser.add_argument("--cli", type=Path, help="legal-move judge; default is sibling try4")
     parser.add_argument("--openings", type=Path,
                         default=Path(__file__).resolve().parents[1] / "docs/selfplay/openings.txt")

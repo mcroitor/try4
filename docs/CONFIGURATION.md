@@ -1,6 +1,6 @@
 # Engine startup configuration
 
-`try4_uci --config PATH` loads an explicit UTF-8 INI file. Without arguments,
+`try4 --config PATH` loads an explicit UTF-8 INI file. Without arguments,
 the engine looks for optional `try4.ini` beside the executable (not in the
 working directory). No file means built-in defaults. `--version` does not
 read configuration. Invalid arguments, unreadable explicit files, invalid

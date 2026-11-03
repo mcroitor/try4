@@ -30,6 +30,8 @@ only when its tag and release report exist.
 
 ### Changed
 
+- Renamed the playable UCI engine from `try4_uci` to `try4` and the debugging
+  console from `try4` to `try4_cli`; select `try4` in your chess GUI.
 - Allocation-free search primitives, fixed PV storage, staged move ordering,
   improved transposition-table reuse and single-pass evaluation (tasks 050–054).
 - Principal-variation search, aspiration windows and guarded search pruning;

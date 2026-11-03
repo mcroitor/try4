@@ -232,7 +232,7 @@ std::optional<UciOptions> StartupConfiguration(int argc, char** argv, std::strin
         return LoadConfiguration(std::filesystem::u8path(argv[2]), error);
     }
     if (argc != 1) {
-        if (error) { *error = "usage: try4_uci [--config PATH | --version]"; }
+        if (error) { *error = "usage: try4 [--config PATH | --version]"; }
         return std::nullopt;
     }
     std::error_code code;

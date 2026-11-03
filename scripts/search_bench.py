@@ -9,8 +9,8 @@ The runner is intentionally a manual Release gate, not a CI test: hosted runner
 timing is too noisy to gate pull requests.
 
 Example:
-    python scripts/search_bench.py --engine build/bench-release/try4_uci.exe \
-      --cli build/bench-release/try4.exe --depths 1,2,3,4,5,6 \
+    python scripts/search_bench.py --engine build/bench-release/try4.exe \
+      --cli build/bench-release/try4_cli.exe --depths 1,2,3,4,5,6 \
       --movetime-ms 2000 --repeats 3 --output build/bench-baseline
 """
 
@@ -677,7 +677,7 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run try4 fixed-depth and fixed-time search benchmarks."
     )
-    parser.add_argument("--engine", required=True, type=Path, help="try4_uci executable")
+    parser.add_argument("--engine", required=True, type=Path, help="try4 UCI executable")
     parser.add_argument(
         "--cli",
         type=Path,
