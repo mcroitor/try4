@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **ID** | 035 |
-| **File** | `task_000000000000000000000000000035.md` |
+| **File** | `task_035.md` |
 | **Stage** | 7 — Performance and strength (optional) |
 | **Depends on** | 034 |
 | **Estimate** | 2 days |

@@ -75,6 +75,11 @@ Expected: the UCI `id` includes the release version.
 
 ## Completion report
 
+**Current reconciliation (2026-11-03):** Done. The dated reports below preserve
+the original 0.1.0 work. Version 0.1.1 is now prepared under task 047; GitHub
+hosts the repository and `e6d6b07` passes Ubuntu, MSVC and sanitizer CI. See
+`docs/RELEASE_CANDIDATE.md` for current release gates.
+
 ### Stage 8 progress (2026-10-25)
 
 - Owner selected MIT; `LICENSE`, notices, and `CONTRIBUTING.md` added.

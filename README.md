@@ -1,6 +1,6 @@
 # try4
 
-`try4` is a C++17 standard-chess engine with a UCI interface, reusable core, debugging CLI, and optional opening books. **Version 0.1.0 is tagged locally as `v0.1.0` after the final local regression matrix.** The repository has no remote, so the tag and release archives are not published; see [`docs/RELEASE_VALIDATION.md`](docs/RELEASE_VALIDATION.md) for evidence and limitations.
+`try4` is a C++17 standard-chess engine with a UCI interface, reusable core, debugging CLI, optional opening books, and Syzygy tablebases. **Version 0.1.1 is in release preparation under task 047.** Source is hosted at [GitHub](https://github.com/mcroitor/try4); no release tag or GitHub release was present when checked on 2026-11-03. See the [candidate report](docs/RELEASE_CANDIDATE.md) for current evidence and remaining gates, and the [historical 0.1.0 report](docs/RELEASE_VALIDATION.md) for the original local matrix.
 
 This is a 4th iteration of the my chess engine development efforts. At the moment the code contains 10-15 % of my hand-written code, started in 2013. Now, when the AI is available, I tried to finish the project with the help of LLMs. The models used in different stages of development:
 
@@ -11,7 +11,7 @@ This is a 4th iteration of the my chess engine development efforts. At the momen
 
 ## Current status
 
-**Core, debugging CLI, search, evaluation, UCI, and opening books implemented.** The current code can:
+**Core, debugging CLI, search, evaluation, UCI, opening books, and Syzygy probing implemented.** The current code can:
 
 - represent a position with a private 0x88 board and public `Square` indices;
 - parse and serialize strict FEN;
@@ -23,7 +23,8 @@ This is a 4th iteration of the my chess engine development efforts. At the momen
 - maintain an incremental Zobrist hash;
 - format and parse UCI and SAN notation;
 - inspect and play positions through a line-oriented CLI;
-- run perft against six standard reference positions at depths 1вЂ“4;
+- run perft against six standard reference positions at depths 1–4;
+- probe optional external Syzygy WDL/DTZ files with fifty-move-aware root results;
 - search legal moves with fail-soft alpha-beta, iterative deepening,
   quiescence, deterministic move ordering, a transposition table, and
   movetime/clock budgets with an atomic stop flag;
@@ -130,7 +131,7 @@ Select `build/release/try4_uci.exe` (Windows) or `build/release/try4_uci`
 build/release/try4_uci --version
 ```
 
-Both the command above and UCI `id name` report `try4 0.1.0`. See
+Both the command above and UCI `id name` report `try4 0.1.1`. See
 [`docs/UCI.md`](docs/UCI.md) for commands, options, and current limitations.
 
 ## Install and package

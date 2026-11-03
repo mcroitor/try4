@@ -204,7 +204,7 @@ sign verified), `docs/CONFIGURATION.md`, `CHANGELOG.md`, and this file.
 | TSCP match | **Recorded** (`build/tscp-match.pgn`, Cute Chess 1.5.1 found on the machine): 8 games at the task's 60/120 control, **try4 6-2-0 vs TSCP 1.81e** (4-0 White, 2-2 Black), LOS 92.1%, Elo +190.8 [-87.2, 468.8]; terminations: 7 mates, 1 TSCP win by mate, 2 time forfeits (one each side); zero crashes or protocol failures |
 | Match result | 6-2-0 in try4's favor; see findings below |
 | Report | `scripts/match_report.py` on the 8-game PGN: ply range 24-404, median 334 |
-| Docs | CONFIGURATION/CHANGELOG updated; PERFORMANCE/ROADMAP pending the match numbers |
+| Docs | CONFIGURATION/CHANGELOG updated; PERFORMANCE/ROADMAP reconciled on 2026-11-03 with the eight-game evidence and the unverified 200-game S3 gate |
 | Full suite | Debug 27/27 pass (28 with the task 034 SEE tests) |
 
 **Risks or follow-ups:**

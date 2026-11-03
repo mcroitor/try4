@@ -5,7 +5,13 @@ only when its tag and release report exist.
 
 ## [Unreleased]
 
+## [0.1.1] — candidate (not released)
+
 ### Added
+
+- Bitboard occupancy-mask and iteration helpers with boundary tests; the full
+  Position/move-generation migration remains task 033.
+- Default-off Lazy SMP proof of concept and its measured go/no-go report.
 
 - Task 035: optional Syzygy WDL+DTZ probing via `SyzygyPath` /
   `[uci] syzygy_path`, using the vendored MIT-licensed Fathom library. Root
@@ -24,10 +30,25 @@ only when its tag and release report exist.
 
 ### Changed
 
+- Allocation-free search primitives, fixed PV storage, staged move ordering,
+  improved transposition-table reuse and single-pass evaluation (tasks 050–054).
+- Principal-variation search, aspiration windows and guarded search pruning;
+  LMR and check extensions remain disabled by default (tasks 055–056).
+- Task 047 prepares 0.1.1 and reconciles task/release status with hosted CI
+  evidence. Release artifacts retain JUnit/logs and source/toolchain provenance.
+- The extracted-package verifier requires Syzygy documentation and the Fathom
+  license and rejects bundled Syzygy tablebase data.
+
 - UCI now emits one `info depth ...` line after each completed iterative-deepening
   iteration instead of only a single line when the search finishes. A terminal
   root, immediate stop, or zero budget still emits an `info depth 0` line before
   `bestmove`.
+
+### Fixed
+
+- Aligned bitboard helper return types, implemented the missing iterator and
+  corrected invalid-square behavior and test arguments.
+- Avoided MSVC's deprecated `getenv` in Syzygy tests with `_dupenv_s`.
 
 ## [0.1.0] — 2026-10-26
 
@@ -87,5 +108,7 @@ See `docs/RELEASE_VALIDATION.md` for commands, commit and checksums.
 - Evaluation and forcing settings are file-only and require a restart.
 - The 1,000-game run is identical-engine stability testing, not strength
   measurement. No calibrated rating is claimed.
-- The tag is local because no git remote is configured; hosted CI, MSVC and a
-  separate physical clean machine were not available.
+- At the original validation date no remote, hosted CI, MSVC run or separate
+  physical clean machine was available. Current post-0.1.0 evidence is tracked
+  in `docs/RELEASE_CANDIDATE.md`; the original tag is absent from the current
+  checkout and GitHub tags API.

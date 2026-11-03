@@ -214,6 +214,14 @@ effective clock, or a slower host can therefore account for several plies of the
 reported gap. This is a hypothesis, not a measurement: task 057 must record the
 binary, build type, time control and `go` line in the match report.
 
+**2026-11-03 reconciliation:** tasks 050–056 are implemented and merged into
+`main`. Task 057 records its revised clock budget, stress run and an eight-game
+TSCP sample (reported 6 wins / 2 losses), including time-forfeit investigations.
+See [`task_057.md`](../tasks/task_057.md) for the actual evidence and uncertainty.
+That sample is not the planned 200-game, zero-forfeit S3 gate and does not
+establish a calibrated strength improvement. It does not replace the original
+task 049 measurements above with a new benchmark.
+
 ### Noise and comparison rules
 
 - Compare node counts and PVs first; they are deterministic for a fixed build

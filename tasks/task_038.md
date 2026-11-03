@@ -98,7 +98,10 @@ archived stability evidence; this task remains Blocked.
 
 ### 2026-10-26 completion
 
-**Status:** Done (local tag; unpublished).
+**Status:** Done (historical 0.1.0 local validation). The original tag is not
+present in the current checkout or GitHub tags API on 2026-11-03. Source is
+hosted and baseline CI passes; 0.1.1 publication and independent verification
+are tracked in task 047. The following bullets are the dated historical record.
 
 - **Stage 8/P1 gate:** task 039 conformance fixes are implemented and covered by
   10 real-process tests plus UCI unit tests.

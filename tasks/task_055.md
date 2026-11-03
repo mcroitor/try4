@@ -111,8 +111,8 @@ python scripts/search_bench.py --engine build/performance/try4_uci.exe \
 
 ## Completion report
 
-**Status:** Done (implementation on `feat/055`; PR pending because remote push
-still lacks SSH credentials).
+**Status:** Done. Merged into `main` by PR #9 (`e6dc46e`); hosted CI on
+`e6d6b07` passed on 2026-11-03. The original measurements below are historical.
 
 **Implementation** (`src/core/search.cpp`, `include/chess/search.hpp`,
 `src/uci/uci.cpp`)
