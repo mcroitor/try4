@@ -1,6 +1,6 @@
 # try4
 
-`try4` is a C++17 standard-chess engine with a UCI interface, reusable core, debugging CLI, optional opening books, and Syzygy tablebases. **Version 0.1.1 is in release preparation under task 047.** Source is hosted at [GitHub](https://github.com/mcroitor/try4); no release tag or GitHub release was present when checked on 2026-11-03. See the [candidate report](docs/RELEASE_CANDIDATE.md) for current evidence and remaining gates, and the [historical 0.1.0 report](docs/RELEASE_VALIDATION.md) for the original local matrix.
+`try4` is a C++17 standard-chess engine with a UCI interface, reusable core, debugging CLI, optional opening books, and Syzygy tablebases. Source is hosted at [GitHub](https://github.com/mcroitor/try4); first release **0.1.1** is available.
 
 This is a 4th iteration of the my chess engine development efforts. At the moment the code contains 10-15 % of my hand-written code, started in 2013. Now, when the AI is available, I tried to finish the project with the help of LLMs. The models used in different stages of development:
 
